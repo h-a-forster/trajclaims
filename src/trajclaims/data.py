@@ -16,7 +16,7 @@ import pyarrow.parquet as pq
 
 from trajclaims.closing import EMBEDDED_REF, REF, closing, tool_cmd
 from trajclaims.models import MODELS
-from trajclaims.verify import verification
+from trajclaims.verify import own_check_pattern, verification
 
 DATASET = "yoonholee/terminalbench-trajectories"
 REVISION = "04e8940f5b6736a7ce8d22224fe2f2af74163ed2"
@@ -110,10 +110,11 @@ def extract_row(row: dict[str, Any], tasks: dict[str, dict[str, Any]]) -> dict[s
     steps = (json.loads(raw) if raw else None) or []
     if row["task_name"] not in tasks:
         raise DataError(f"unknown task {row['task_name']!r}: rebuild configs/tasks.json")
-    limit = tasks[row["task_name"]]["agent_timeout_s"]
+    task = tasks[row["task_name"]]
+    limit = task["agent_timeout_s"]
     timed_out = (row["duration_seconds"] or 0.0) >= TIMEOUT_MARGIN * limit
     end = closing(row["agent"], steps, timed_out)
-    check = verification(steps)
+    check = verification(steps, own_check_pattern(task.get("own_check", [])))
     return {
         "task": row["task_name"],
         "scaffold": row["agent"],

@@ -51,6 +51,16 @@ def verification_tables(labelled: pd.DataFrame) -> dict[str, Any]:
             "opaque_share": float(group["opaque_commands"].sum() / shell) if shell else 0.0,
             "blank_share": float(group["blank_commands"].sum() / shell) if shell else 0.0,
         }
+    shipped = sorted(failed.loc[failed["verification"] == "task-check", "task"].unique())
+    own_check = {
+        task: {
+            "failed": int((failed["task"] == task).sum()),
+            "ran_own_check": int(
+                ((failed["task"] == task) & (failed["verification"] == "task-check")).sum()
+            ),
+        }
+        for task in shipped
+    }
     # Blank commands hide what ran, so those trials cannot be classified.
     usable = failed[
         (failed["status"] == "readable")
@@ -73,6 +83,7 @@ def verification_tables(labelled: pd.DataFrame) -> dict[str, Any]:
     checks = ["adhoc_check", "test_run"]
     return {
         "by_scaffold": by_scaffold,
+        "own_check_tasks": own_check,
         "regression_n": len(fit_frame),
         "regression_tasks": int(fit_frame["task"].nunique()),
         "regression_tasks_dropped_constant": int(usable.loc[constant, "task"].nunique()),

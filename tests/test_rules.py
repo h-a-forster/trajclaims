@@ -7,7 +7,7 @@ from trajclaims.rules import label
 CLAIMS = [
     "Done! The program is at `/app/gpt2.c` and compiles with gcc.",
     "Analysis: The file exists and has the right format.\nPlan: The task is complete.",
-    "THOUGHT: All requirements have been met.\n\n```bash\necho COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\n```",
+    "THOUGHT: All requirements have been met.\n\n```bash\necho COMPLETE_TASK\n```",
     "I've created `/app/run.py`. It limits concurrency with a semaphore.",
     "Nginx is now configured and running on port 8080.",
     "Re-ran verification: 40 tests passed, 0 failed.",

@@ -15,7 +15,10 @@
   "break-filter-js-from-html": {
    "agent_timeout_s": 1200.0,
    "category": "security",
-   "difficulty": "medium"
+   "difficulty": "medium",
+   "own_check": [
+    "tests/test_outputs.py"
+   ]
   },
   "build-cython-ext": {
    "agent_timeout_s": 900.0,
@@ -50,7 +53,10 @@
   "circuit-fibsqrt": {
    "agent_timeout_s": 3600.0,
    "category": "software-engineering",
-   "difficulty": "hard"
+   "difficulty": "hard",
+   "own_check": [
+    "tests/test_outputs.py"
+   ]
   },
   "cobol-modernization": {
    "agent_timeout_s": 900.0,
@@ -200,12 +206,18 @@
   "large-scale-text-editing": {
    "agent_timeout_s": 1200.0,
    "category": "file-operations",
-   "difficulty": "medium"
+   "difficulty": "medium",
+   "own_check": [
+    "tests/test_outputs.py"
+   ]
   },
   "largest-eigenval": {
    "agent_timeout_s": 900.0,
    "category": "mathematics",
-   "difficulty": "medium"
+   "difficulty": "medium",
+   "own_check": [
+    "src/eval.py"
+   ]
   },
   "llm-inference-batching-scheduler": {
    "agent_timeout_s": 1800.0,
@@ -220,7 +232,10 @@
   "mailman": {
    "agent_timeout_s": 1800.0,
    "category": "system-administration",
-   "difficulty": "medium"
+   "difficulty": "medium",
+   "own_check": [
+    "src/eval.py"
+   ]
   },
   "make-doom-for-mips": {
    "agent_timeout_s": 900.0,
@@ -280,7 +295,10 @@
   "overfull-hbox": {
    "agent_timeout_s": 750.0,
    "category": "debugging",
-   "difficulty": "easy"
+   "difficulty": "easy",
+   "own_check": [
+    "tests/test_outputs.py"
+   ]
   },
   "password-recovery": {
    "agent_timeout_s": 900.0,
@@ -360,7 +378,10 @@
   "regex-chess": {
    "agent_timeout_s": 3600.0,
    "category": "software-engineering",
-   "difficulty": "hard"
+   "difficulty": "hard",
+   "own_check": [
+    "check.py"
+   ]
   },
   "regex-log": {
    "agent_timeout_s": 900.0,
@@ -390,7 +411,10 @@
   "schemelike-metacircular-eval": {
    "agent_timeout_s": 2400.0,
    "category": "software-engineering",
-   "difficulty": "medium"
+   "difficulty": "medium",
+   "own_check": [
+    "tests/test_outputs.py"
+   ]
   },
   "sparql-university": {
    "agent_timeout_s": 900.0,
@@ -425,7 +449,10 @@
   "tune-mjcf": {
    "agent_timeout_s": 900.0,
    "category": "scientific-computing",
-   "difficulty": "medium"
+   "difficulty": "medium",
+   "own_check": [
+    "src/eval.py"
+   ]
   },
   "video-processing": {
    "agent_timeout_s": 3600.0,

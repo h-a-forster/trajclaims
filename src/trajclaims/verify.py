@@ -28,9 +28,6 @@ EDIT_TOOLS = frozenset(
 )
 READONLY_EDITOR = frozenset({"view"})
 
-# The verifier uploads tests/test.sh and tests/test_outputs.py only after the agent has finished,
-# so a hit here means the agent went looking for them, or fetched them from outside.
-TASK_CHECK = re.compile(r"test_outputs\.py|/tests/test\.sh|/tests/test_outputs")
 TEST_RUNNER = re.compile(
     r"(?:^|[\s;&|(/])(?:"
     r"pytest|py\.test|tox|nox|ctest|rspec|phpunit|"
@@ -45,6 +42,10 @@ ADHOC_CHECK = re.compile(
     r"\bassert\b|\bdiff\s+\S|\bcmp\s+\S|sha256sum\s+-c|md5sum\s+-c|"
     r"(?:python[\d.]*|bash|sh|node|Rscript|\./)\s*\S*"
     r"(?:verif|valid|check|compare|sanity|smoke)\w*(?:\.\w+)?"
+)
+# Installing a test tool is not running it.
+INSTALL = re.compile(
+    r"\b(?:pip3?|uv\s+pip|apt(?:-get)?|conda|npm|yarn)\s+(?:-\S+\s+)*(?:install|add)\b[^;&|\n]*"
 )
 # Writes through the shell. `>` alone would catch `2>/dev/null`.
 SHELL_EDIT = re.compile(
@@ -61,7 +62,23 @@ class Verification:
     blank_commands: int
 
 
-def verification(steps: list[dict[str, Any]]) -> Verification:
+def own_check_pattern(files: list[str]) -> re.Pattern[str] | None:
+    """Running one of a task's shipped check files.
+
+    The verifier uploads tests/ only after the agent stops, so most tasks have no check an agent
+    could run; configs/tasks.json lists the nine that ship one in their environment.
+    """
+    if not files:
+        return None
+    names = "|".join(re.escape(f.rsplit("/", 1)[-1]) for f in files)
+    return re.compile(
+        rf"(?:python[\d.]*|pytest|bash|sh|node|Rscript)\s+(?:-\S+\s+)*\S*(?:{names})(?![\w.-])"
+    )
+
+
+def verification(
+    steps: list[dict[str, Any]], own_check: re.Pattern[str] | None = None
+) -> Verification:
     """The strongest check among visible shell commands, and whether one followed the last edit.
 
     A command lost to the scrape cannot be read, so `level` is a lower bound; `opaque_commands`
@@ -89,11 +106,12 @@ def verification(steps: list[dict[str, Any]]) -> Verification:
                 last_edit = index
                 continue
             level = 0
-            if TASK_CHECK.search(cmd):
+            code = INSTALL.sub(" ", cmd)
+            if own_check is not None and own_check.search(code):
                 level = rank["task-check"]
-            elif TEST_RUNNER.search(cmd):
+            elif TEST_RUNNER.search(code):
                 level = rank["test-runner"]
-            elif ADHOC_CHECK.search(cmd):
+            elif ADHOC_CHECK.search(code):
                 level = rank["adhoc-check"]
             if level:
                 best = max(best, level)

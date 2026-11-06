@@ -25,6 +25,7 @@ Runner = Callable[[Sequence[str], str], str]
 BATCH = 20
 MAX_CHARS = 6000
 TIMEOUT_S = 600
+RETRIES = 3
 
 _SHARED = """\
 Each message below is the last thing a coding agent said after working on a task in a terminal.
@@ -209,15 +210,21 @@ def run_labeller(
     batches = [todo[i : i + BATCH] for i in range(0, len(todo), BATCH)]
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    failures: list[str] = []
+
     def work(batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Answers occasionally miscopy an id or refuse: split, then retry a lone message."""
         ids = [item["id"] for item in batch]
-        try:
-            stdout = runner(_argv(labeller), _batch_prompt(labeller, batch))
-            labels, models = _parse(stdout, ids)
-        except (LabellerError, ValueError, KeyError, subprocess.TimeoutExpired):
-            if len(batch) == 1:
-                raise
-            # One message can spoil a batch (a refusal, say): split to isolate it.
+        for attempt in range(1 if len(batch) > 1 else RETRIES):
+            try:
+                stdout = runner(_argv(labeller), _batch_prompt(labeller, batch))
+                labels, models = _parse(stdout, ids)
+                break
+            except (LabellerError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
+                if len(batch) == 1 and attempt == RETRIES - 1:
+                    failures.append(f"{ids[0]}: {str(exc)[:160]}")
+                    return []
+        else:
             middle = len(batch) // 2
             return work(batch[:middle]) + work(batch[middle:])
         return [
@@ -231,17 +238,10 @@ def run_labeller(
             for i in ids
         ]
 
-    failures: list[str] = []
     with ThreadPoolExecutor(workers) as pool, out.open("a", encoding="utf-8", newline="\n") as sink:
-        futures = [pool.submit(work, batch) for batch in batches]
-        for number, future in enumerate(futures, 1):
-            try:
-                rows = future.result()
-            except (LabellerError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
-                failures.append(str(exc)[:200])
-                continue
+        for number, rows in enumerate(pool.map(work, batches), 1):
             sink.writelines(json.dumps(row, sort_keys=True) + "\n" for row in rows)
             sink.flush()
             log(f"{labeller.name}: batch {number}/{len(batches)} done")
     if failures:
-        raise LabellerError(f"{len(failures)} batches failed; rerun to retry: {failures[0]}")
+        raise LabellerError(f"{len(failures)} messages failed; rerun to retry: {failures[0]}")

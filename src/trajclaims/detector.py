@@ -134,7 +134,7 @@ def run(
     for code, name in enumerate(names):
         mask = codes == code
         ys = y[mask]
-        if min(ys.sum(), len(ys) - ys.sum()) < MIN_CLASS:
+        if len(names) < 2 or min(ys.sum(), len(ys) - ys.sum()) < MIN_CLASS:
             continue
         scores = _fold_scores(frame, "closing", f"loso-{name}", mask, unit_dir)
         held[name] = weighted_auroc(ys, scores, np.ones(len(ys)))
