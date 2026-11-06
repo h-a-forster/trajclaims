@@ -99,3 +99,18 @@ def test_blank_commands_are_counted():
 def test_the_submit_sentinel_is_not_a_command():
     found = verification([run("echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT")])
     assert found.shell_commands == 0
+
+
+def test_a_check_after_codex_apply_patch_counts_and_one_before_does_not():
+    patch = "apply_patch *** Begin Patch"
+    check = "pytest -q"
+    assert verification([run(patch), run(check)]).after_last_edit
+    assert not verification([run(check), run(patch)]).after_last_edit
+
+
+def test_a_check_in_the_step_of_the_last_edit_counts_as_after_it():
+    assert verification([run("sed -i s/a/b/ f.py", "pytest -q")]).after_last_edit
+
+
+def test_judy_replace_file_is_an_edit():
+    assert not verification([run("pytest -q"), run("/app/x.py", fn="replace_file")]).after_last_edit

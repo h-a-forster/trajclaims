@@ -24,7 +24,16 @@ SHELL_TOOLS = frozenset(
     }
 )
 EDIT_TOOLS = frozenset(
-    {"str_replace_editor", "Write", "Edit", "MultiEdit", "write_file", "edit_file", "replace"}
+    {
+        "str_replace_editor",
+        "Write",
+        "Edit",
+        "MultiEdit",
+        "write_file",
+        "edit_file",
+        "replace",
+        "replace_file",
+    }
 )
 READONLY_EDITOR = frozenset({"view"})
 
@@ -49,7 +58,8 @@ INSTALL = re.compile(
 )
 # Writes through the shell. `>` alone would catch `2>/dev/null`.
 SHELL_EDIT = re.compile(
-    r"(?<![\d&2])>{1,2}\s*(?!/dev/|&)[\w./~\"'-]|\bsed\s+-i|\btee\s+\S|\bpatch\s|\bgit\s+apply\b"
+    r"(?<![\d&2])>{1,2}\s*(?!/dev/|&)[\w./~\"'-]|\bsed\s+-i|\btee\s+\S|\b(?:apply_)?patch\s|"
+    r"\bgit\s+apply\b"
 )
 
 

@@ -108,3 +108,21 @@ def test_contrast_size_and_holm_control_on_a_clustered_null():
 def test_percentile_of_an_impossible_group_is_nan():
     low, high = stats.percentile(np.full((10, 1), np.nan))
     assert np.isnan(low[0]) and np.isnan(high[0])
+
+
+def test_a_bias_corrected_interval_recentres_on_the_estimate():
+    draws = np.random.default_rng(1).normal(0.6, 0.05, 20000)
+    plain = np.quantile(draws, [0.025, 0.975])
+    low, high = stats.bias_corrected(0.65, draws)
+    assert low > plain[0] + 0.05 and high > plain[1] + 0.05
+    centred = stats.bias_corrected(0.6, draws)
+    assert centred == pytest.approx(tuple(plain), abs=0.005)
+
+
+def test_a_range_interval_reaches_zero_for_equal_groups_and_not_for_separated_ones():
+    rng = np.random.default_rng(2)
+    equal = np.array([0.5, 0.5, 0.5])
+    assert stats.range_interval(equal, rng.normal(equal, 0.05, (5000, 3)))[0] == 0.0
+    apart = np.array([0.2, 0.5, 0.8])
+    low, high = stats.range_interval(apart, rng.normal(apart, 0.02, (5000, 3)))
+    assert 0.5 < low < 0.6 < high < 0.7

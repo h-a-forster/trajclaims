@@ -93,3 +93,22 @@ def test_non_string_arguments_do_not_stop_extraction():
     for value in (7, {"path": "/app"}):
         steps = [agent("Reading.", [{"fn": "read_file", "cmd": value}])]
         assert closing("gemini-cli", steps).ending == "cutoff"
+
+
+def test_a_signal_beside_commands_keeps_the_step_text():
+    # terminus-2 sends task_complete with its last commands; 1,835 listings ended this way.
+    last = BASH + MARK
+    end = closing("terminus-2", [agent("Run.", BASH), agent("The task is complete.", last)])
+    assert (end.status, end.text, end.with_command) == ("readable", "The task is complete.", True)
+    assert closing("terminus-2", [agent("$4f", last)]).status == "lost"
+    assert closing("terminus-2", [agent("Done.", MARK)]).with_command is False
+
+
+def test_a_silent_confirmation_falls_back_to_the_step_that_spoke():
+    end = closing("terminus-2", [agent("Finished it.", BASH + MARK), agent("", MARK)])
+    assert (end.text, end.with_command) == ("Finished it.", True)
+
+
+def test_a_command_step_without_a_signal_still_ends_the_search():
+    end = closing("terminus-2", [agent("Working.", BASH), agent("", MARK)])
+    assert (end.ending, end.status) == ("declared", "no-text")

@@ -10,14 +10,14 @@ from pathlib import Path
 
 from trajclaims import __version__, data, labellers, report, study, validation
 
-RAW = Path("data/raw")
-UNITS = Path("data/units")
-SAMPLE = Path("data/validation/sample.jsonl")
-RAW_A = Path("data/validation/label_a.jsonl")
-RAW_B = Path("data/validation/label_b.jsonl")
-RAW_ADJ = Path("data/validation/adjudicated.jsonl")
-OUT = Path("results/v1")
-DETECTOR_UNITS = Path("data/detector")
+RAW = data.ROOT / "data/raw"
+UNITS = data.ROOT / "data/units"
+SAMPLE = data.ROOT / "data/validation/sample.jsonl"
+RAW_A = data.ROOT / "data/validation/label_a.jsonl"
+RAW_B = data.ROOT / "data/validation/label_b.jsonl"
+RAW_ADJ = data.ROOT / "data/validation/adjudicated.jsonl"
+OUT = data.ROOT / "results/v1"
+DETECTOR_UNITS = data.ROOT / "data/detector"
 
 
 def _log(line: str) -> None:
@@ -44,29 +44,15 @@ def cmd_extract(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_sample(_: argparse.Namespace) -> int:
-    """Draw the validation sample; refuses to replace one already drawn."""
-    if SAMPLE.exists():
+def cmd_sample(args: argparse.Namespace) -> int:
+    """Draw the validation sample; a drawn one is never replaced, only extended by new strata."""
+    if SAMPLE.exists() and not args.extend:
         raise SystemExit(f"{SAMPLE} exists: a sample is drawn once, after the rules are frozen")
-    trials, _ = data.load_trials(UNITS)
-    sample = validation.draw(study.assign_labels(trials))
-    columns = {
-        "id": "id",
-        "task": "task",
-        "scaffold": "scaffold",
-        "model": "model",
-        "trial": "trial",
-        "reward": "reward",
-        "stratum": "stratum",
-        "stratum_n": "stratum_n",
-        "closing_text": "text",
-        "label": "rule_label",
-        "rule": "rule",
-    }
-    rows = sample[list(columns)].rename(columns=columns).to_dict("records")
+    trials, _counts = data.load_trials(UNITS)
     sha = study.rules_sha()
-    for row in rows:
-        row["rules_sha"] = sha
+    rows = validation.sample_rows(study.assign_labels(trials), sha)
+    if SAMPLE.exists():
+        rows = validation.extend(validation.read_jsonl(SAMPLE), rows)
     _write_jsonl(SAMPLE, rows)
     _log(f"sample: {len(rows)} messages, rules {sha[:12]}")
     return 0
@@ -143,7 +129,9 @@ def main(argv: list[str] | None = None) -> int:
     extract = commands.add_parser("extract", help="reduce trials to one row each")
     extract.add_argument("--force", action="store_true", help="rebuild finished units")
     extract.set_defaults(func=cmd_extract)
-    commands.add_parser("sample", help="draw the validation sample").set_defaults(func=cmd_sample)
+    sample = commands.add_parser("sample", help="draw the validation sample")
+    sample.add_argument("--extend", action="store_true", help="add strata the sample lacks")
+    sample.set_defaults(func=cmd_sample)
     label = commands.add_parser("label", help="blind labels through the claude CLI")
     label.add_argument("--workers", type=int, default=4)
     label.set_defaults(func=cmd_label)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "trajclaims"
-version = "0.1.0"
+version = "0.2.0"
 description = "False-completion audit of public Terminal-Bench 2 trajectories: what agents claim against what the verifier found."
 readme = "README.md"
 license = "MIT"

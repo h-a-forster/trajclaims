@@ -2,11 +2,13 @@
 
 Among trials whose closing statement claims completion, predict that the verifier failed them.
 The label is the verifier's, so it does not depend on text; the paper's false-success label is a
-regex over the closing message. Each fold is a file under `unit_dir`, skipped on rerun.
+regex over the closing message. Each fold is a file under `unit_dir`, in a folder named for a hash
+of the inputs, and is skipped on rerun with the same inputs.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections.abc import Callable
@@ -54,42 +56,46 @@ def _id_scores(train: pd.DataFrame, y: np.ndarray, test: pd.DataFrame) -> np.nda
     return model.predict_proba(encoder.transform(test))[:, 1]
 
 
+def _cached(unit: Path, compute: Callable[[], np.ndarray]) -> np.ndarray:
+    """Scores from `unit`, computing them if absent. Rounding happens first, on both paths:
+    rounded scores tie where exact ones do not, and ties change AUROC."""
+    if unit.exists():
+        return np.array(json.loads(unit.read_text(encoding="utf-8")))
+    scores = [round(float(s), 6) for s in compute()]
+    part = unit.with_suffix(".part")
+    part.write_text(json.dumps(scores), encoding="utf-8")
+    os.replace(part, unit)
+    return np.array(scores)
+
+
 def _fold_scores(
     frame: pd.DataFrame, feature: str, fold: int, test_mask: np.ndarray, unit_dir: Path
 ) -> np.ndarray:
-    unit = unit_dir / f"s{DETECTOR_SCHEMA}-{feature}-{fold}.json"
-    if unit.exists():
-        return np.array(json.loads(unit.read_text(encoding="utf-8")))
-    train, test = frame[~test_mask], frame[test_mask]
-    y = train["failed"].to_numpy()
-    if feature == "ids":
-        columns = ["scaffold", "model"]
-        scores = _id_scores(train[columns], y, test[columns])
-    elif feature == "closing+tail":
-        scores = _tfidf_scores(
-            train["closing"] + "\n" + train["tail"], y, test["closing"] + "\n" + test["tail"]
-        )
-    else:
-        scores = _tfidf_scores(train[feature], y, test[feature])
-    part = unit.with_suffix(".part")
-    part.write_text(json.dumps([round(float(s), 6) for s in scores]), encoding="utf-8")
-    os.replace(part, unit)
-    return scores
+    def compute() -> np.ndarray:
+        train, test = frame[~test_mask], frame[test_mask]
+        y = train["failed"].to_numpy()
+        if feature == "ids":
+            columns = ["scaffold", "model"]
+            return _id_scores(train[columns], y, test[columns])
+        if feature == "closing+tail":
+            return _tfidf_scores(
+                train["closing"] + "\n" + train["tail"], y, test["closing"] + "\n" + test["tail"]
+            )
+        return _tfidf_scores(train[feature], y, test[feature])
+
+    return _cached(unit_dir / f"s{DETECTOR_SCHEMA}-{feature}-{fold}.json", compute)
 
 
 def _pair_scores(
     frame: pd.DataFrame, name: str, train: np.ndarray, test: np.ndarray, unit_dir: Path
 ) -> np.ndarray:
     """Closing-text scores for an explicit train and test split, cached as a unit."""
-    unit = unit_dir / f"s{DETECTOR_SCHEMA}-closing-{name}.json"
-    if unit.exists():
-        return np.array(json.loads(unit.read_text(encoding="utf-8")))
-    y = frame.loc[train, "failed"].to_numpy()
-    scores = _tfidf_scores(frame.loc[train, "closing"], y, frame.loc[test, "closing"])
-    part = unit.with_suffix(".part")
-    part.write_text(json.dumps([round(float(s), 6) for s in scores]), encoding="utf-8")
-    os.replace(part, unit)
-    return scores
+
+    def compute() -> np.ndarray:
+        y = frame.loc[train, "failed"].to_numpy()
+        return _tfidf_scores(frame.loc[train, "closing"], y, frame.loc[test, "closing"])
+
+    return _cached(unit_dir / f"s{DETECTOR_SCHEMA}-closing-{name}.json", compute)
 
 
 def _pooled_folds(y: np.ndarray, scores: np.ndarray, folds: np.ndarray) -> float:
@@ -134,8 +140,10 @@ def run(
     frame: pd.DataFrame, unit_dir: Path, log: Callable[[str], None] = print
 ) -> dict[str, object]:
     """`frame` has task, scaffold, model, failed, closing, tail. Returns the summary block."""
-    unit_dir.mkdir(parents=True, exist_ok=True)
     frame = frame.reset_index(drop=True)
+    inputs = pd.util.hash_pandas_object(frame, index=False).to_numpy().tobytes()
+    unit_dir = unit_dir / hashlib.sha256(inputs).hexdigest()[:16]
+    unit_dir.mkdir(parents=True, exist_ok=True)
     y = frame["failed"].to_numpy()
     tasks = frame["task"].to_numpy()
     folds = np.zeros(len(frame), dtype=int)

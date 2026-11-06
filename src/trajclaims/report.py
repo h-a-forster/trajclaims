@@ -6,6 +6,12 @@ from pathlib import Path
 
 import pandas as pd
 
+CELL_NOTE = (
+    "A cell inherits its scaffold's error rates, so its Rogan-Gladen figure is unstable and is "
+    "clipped to 0 to 100 only for display; 100.0 means the correction hit the boundary. Prefer "
+    "the calibrated column here."
+)
+
 
 def _pct(value: float) -> str:
     return "n/a" if pd.isna(value) else f"{100 * value:.1f}"
@@ -73,4 +79,6 @@ def write_tables(out: Path) -> None:
     for level, title in levels:
         table = fcr[(fcr["level"] == level) & fcr["reportable_readable"]]
         lines += [f"## {title}", "", *_rate_rows(table), ""]
+        if level == "cell":
+            lines += [CELL_NOTE, ""]
     (out / "tables.md").write_text("\n".join(lines), encoding="utf-8", newline="\n")

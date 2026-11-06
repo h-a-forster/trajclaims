@@ -32,6 +32,38 @@ def percentile(draws: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return np.nanquantile(draws, 0.025, axis=0), np.nanquantile(draws, 0.975, axis=0)
 
 
+def bias_corrected(point: float, draws: np.ndarray) -> tuple[float, float]:
+    """Efron's bias-corrected percentile interval.
+
+    For a statistic whose bootstrap distribution sits to one side of the estimate. Variance
+    shares are one: resampling adds noise to the cell means, which moves replicates towards the
+    residual, so a plain percentile interval is off-centre.
+    """
+    below = (np.mean(draws < point) + np.mean(draws <= point)) / 2
+    z0 = sps.norm.ppf(np.clip(below, 1 / (2 * len(draws)), 1 - 1 / (2 * len(draws))))
+    low, high = sps.norm.cdf([2 * z0 - Z95, 2 * z0 + Z95])
+    return float(np.quantile(draws, low)), float(np.quantile(draws, high))
+
+
+def range_interval(point: np.ndarray, draws: np.ndarray) -> tuple[float, float]:
+    """Interval for max - min of group means, from a simultaneous band on their differences.
+
+    A percentile interval of bootstrapped ranges cannot reach zero, because a resampled range
+    is never below the gap noise opens between equal groups. Here every pairwise difference
+    gets a studentised max-|t| band, so the interval reaches zero when no pair is separated.
+    """
+    left, right = np.triu_indices(len(point), k=1)
+    diff = point[left] - point[right]
+    spread = draws[:, left] - draws[:, right]
+    se = np.nanstd(spread, axis=0, ddof=1)
+    t = np.nanmax(np.abs(spread - diff) / np.where(se > 0, se, np.inf), axis=1)
+    critical = np.nanquantile(t, 0.95)
+    return (
+        float(max(0.0, np.max(np.abs(diff) - critical * se))),
+        float(np.max(np.abs(diff) + critical * se)),
+    )
+
+
 def holm(pvalues: np.ndarray) -> np.ndarray:
     """Holm step-down adjusted p-values, in input order."""
     p = np.asarray(pvalues, dtype=float)

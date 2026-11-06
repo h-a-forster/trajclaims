@@ -171,7 +171,8 @@ def _parse(stdout: str, ids: list[str]) -> tuple[dict[str, str], list[str]]:
     if envelope.get("is_error"):
         raise LabellerError(f"claude reported an error: {str(envelope.get('result'))[:300]}")
     text = envelope["result"]
-    start = text.find('{"labels"')
+    # The last object is the answer: a model that miscopies an id corrects itself after it.
+    start = text.rfind('{"labels"')
     if start < 0:
         raise LabellerError(f"no JSON in answer: {text[:200]!r}")
     labels = json.JSONDecoder().raw_decode(text, start)[0]["labels"]

@@ -27,12 +27,17 @@ BOILERPLATE = frozenset({"All done! What's next on the agenda?"})
 
 @dataclass(frozen=True, slots=True)
 class Closing:
-    """`ending` is structural; `status` says whether a closing statement can be read."""
+    """`ending` is structural; `status` says whether a closing statement can be read.
+
+    `with_command` marks text from a step that also ran commands (terminus-2 may send
+    `mark_task_complete` beside them), so the validation can sample those closings apart.
+    """
 
     ending: str
     status: str
     text: str = ""
     signal: str = ""
+    with_command: bool = False
 
 
 def tool_cmd(tool: dict[str, Any]) -> str:
@@ -103,7 +108,8 @@ def closing(scaffold: str, steps: list[dict[str, Any]], timed_out: bool = False)
     else:
         ending = "stopped"
     for step in reversed(agent):
-        if not _only_closing(step):
+        only_closing = _only_closing(step)
+        if not only_closing and not _signal(step):
             break
         for candidate in (_finish_message(step), step.get("msg") or ""):
             text = candidate.strip()
@@ -111,5 +117,5 @@ def closing(scaffold: str, steps: list[dict[str, Any]], timed_out: bool = False)
                 continue
             if REF.fullmatch(text):
                 return Closing(ending, "lost", signal=signal)
-            return Closing(ending, "readable", text, signal)
+            return Closing(ending, "readable", text, signal, not only_closing)
     return Closing(ending, "lost" if signal == "finish" else "no-text", signal=signal)

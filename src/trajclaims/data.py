@@ -41,11 +41,12 @@ COLUMNS = [
 ]
 KEY = ["task", "scaffold", "model_raw", "trial"]
 # Bump when extraction output changes, so stale units are rebuilt.
-EXTRACT_SCHEMA = 1
+EXTRACT_SCHEMA = 2
 TAIL_CHARS = 6000
 # A trial at 98% of its task's agent timeout counts as having hit it.
 TIMEOUT_MARGIN = 0.98
-TASKS_FILE = Path(__file__).resolve().parents[2] / "configs" / "tasks.json"
+ROOT = Path(__file__).resolve().parents[2]
+TASKS_FILE = ROOT / "configs" / "tasks.json"
 
 
 class DataError(Exception):
@@ -132,6 +133,7 @@ def extract_row(row: dict[str, Any], tasks: dict[str, dict[str, Any]]) -> dict[s
         "status": end.status if steps else "no-steps",
         "signal": end.signal,
         "closing_text": end.text,
+        "with_command": end.with_command,
         "verification": check.level,
         "verified_after_edit": check.after_last_edit,
         "shell_commands": check.shell_commands,

@@ -10,7 +10,7 @@ authors:
   - name: h-a-forster
 repository-code: "https://github.com/h-a-forster/trajclaims"
 license: MIT
-version: 0.1.0
+version: 0.2.0
 date-released: "2026-11-06"
 keywords:
   - llm evaluation

@@ -32,6 +32,7 @@ LABEL_COLUMNS = [
     "ending",
     "status",
     "signal",
+    "with_command",
     "label",
     "rule",
     "verification",
@@ -62,6 +63,7 @@ def assign_labels(trials: pd.DataFrame) -> pd.DataFrame:
         rules.append(rule)
     frame["label"], frame["rule"] = labels, rules
     frame["dev"] = is_dev(frame)
+    frame["closing_group"] = validation.closing_group(frame)
     return frame
 
 
@@ -69,6 +71,7 @@ def labels_jsonl(frame: pd.DataFrame) -> bytes:
     """Labels as canonical bytes; the regeneration oracle compares these."""
     lines = []
     for row in frame[LABEL_COLUMNS].to_dict("records"):
+        row["with_command"] = bool(row["with_command"])
         row["verified_after_edit"] = bool(row["verified_after_edit"])
         row["timed_out"] = bool(row["timed_out"])
         lines.append(json.dumps(row, sort_keys=True, ensure_ascii=False))
@@ -123,13 +126,14 @@ def claim_rates(errors: dict[str, dict[str, int]]) -> dict[str, dict[str, Any]]:
 def _corrected_cells(
     frame: pd.DataFrame, rates: dict[str, dict[str, Any]], weights: np.ndarray, seed: int
 ) -> dict[str, Any]:
-    """Rogan-Gladen claim counts per scaffold x model cell, among readable failed closings.
+    """Rogan-Gladen claim counts per closing group x model cell, among readable failed closings.
 
     The validation sample covers readable closings only, so the correction applies there.
-    Sensitivity and specificity are scaffold-level; draws carry their sampling noise.
+    Sensitivity and specificity are group-level; draws carry their sampling noise. Counts stay
+    unclipped: the estimator is linear in a group, so clipping a cell would bias the sum.
     """
     readable = frame[(frame["reward"] == 0) & (frame["status"] == "readable")]
-    cell = readable["scaffold"] + "|" + readable["model"]
+    cell = readable["closing_group"] + "|" + readable["model"]
     cells = pd.Index(sorted(cell.unique()))
     tasks = pd.Index(sorted(frame["task"].unique()))
     num = task_matrix(readable, (readable["label"] == CLAIM).to_numpy(), tasks, cell, cells)
@@ -178,8 +182,8 @@ def _corrected_cells(
         "cells": cells,
         "seen": den.sum(0),
         "seen_draws": seen_draws,
-        "count": np.clip(point, 0.0, 1.0) * den.sum(0),
-        "count_draws": np.clip(corrected, 0.0, 1.0) * seen_draws,
+        "count": point * den.sum(0),
+        "count_draws": corrected * seen_draws,
         "calibrated": calibrated_point * den.sum(0),
         "calibrated_draws": calibrated * seen_draws,
     }
@@ -274,20 +278,20 @@ def _add_corrected(
     rates: dict[str, dict[str, Any]],
     weights: np.ndarray,
 ) -> None:
-    """Corrected FCR over readable closings, aggregated from scaffold x model cells."""
+    """Corrected FCR over readable closings, aggregated from closing group x model cells."""
     block = _corrected_cells(frame, rates, weights, SEED + 1)
-    cells = block["cells"]
+    cells = [c.replace(validation.WITH_COMMAND, "") for c in block["cells"]]
     key = {
         "all": ["all"] * len(cells),
         "scaffold": [c.split("|")[0] for c in cells],
         "model": [c.split("|")[1] for c in cells],
-        "cell": list(cells),
+        "cell": cells,
     }[level]
     rows = np.zeros((len(cells), len(table)))
     rows[np.arange(len(cells)), pd.Index(table["group"]).get_indexer(key)] = 1.0
     with np.errstate(divide="ignore", invalid="ignore"):
-        corrected = (rows.T @ block["count"]) / (rows.T @ block["seen"])
-        draws = (block["count_draws"] @ rows) / (block["seen_draws"] @ rows)
+        corrected = np.clip((rows.T @ block["count"]) / (rows.T @ block["seen"]), 0.0, 1.0)
+        draws = np.clip((block["count_draws"] @ rows) / (block["seen_draws"] @ rows), 0.0, 1.0)
     low, high = stats.percentile(draws)
     table["fcr_readable_corrected"] = corrected
     table["fcr_readable_corrected_low"] = low
@@ -367,6 +371,10 @@ def _bridge_rates(rows: list[dict[str, Any]]) -> dict[str, float]:
 def sensitivity(labelled: pd.DataFrame, trials: pd.DataFrame) -> dict[str, Any]:
     """FCR per scaffold on alternative populations, and the template stratum."""
     means = trials.groupby("task")["reward"].mean()
+    failed_read = labelled[(labelled["reward"] == 0) & (labelled["status"] == "readable")]
+    sizes = failed_read.groupby("scaffold").size()
+    main = sizes[sizes >= MIN_CELL]
+    claimed = failed_read[failed_read["label"] == CLAIM].groupby("scaffold").size()
     never = sorted(means[means == 0].index)
     rare = sorted(means[means < 0.02].index)
     known = labelled[(labelled["reward"] == 0) & (labelled["status"] != "lost")]
@@ -394,6 +402,15 @@ def sensitivity(labelled: pd.DataFrame, trials: pd.DataFrame) -> dict[str, Any]:
         for ending, group in has_steps.groupby("ending", sort=True)
     }
     return {
+        "composition_failed_readable": {
+            "share": {str(k): float(v / sizes.sum()) for k, v in sizes.items()},
+            "unweighted_mean_fcr": float((claimed.reindex(main.index, fill_value=0) / main).mean()),
+            "scaffolds_in_mean": len(main),
+        },
+        "fcr_readable_by_closing_group": {
+            str(k): {"n": len(v), "fcr": float((v["label"] == CLAIM).mean())}
+            for k, v in failed_read.groupby("closing_group", sort=True)
+        },
         "ending_check": ending_check,
         "never_solved_tasks": never,
         "rarely_solved_tasks": rare,
@@ -413,7 +430,9 @@ def sensitivity(labelled: pd.DataFrame, trials: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def validation_summary(rows: list[dict[str, Any]], current_sha: str) -> dict[str, Any]:
+def validation_summary(
+    rows: list[dict[str, Any]], current_sha: str, labelled: pd.DataFrame
+) -> dict[str, Any]:
     """Agreement and rule accuracy from results/v1/validation.jsonl."""
     sample = pd.DataFrame(rows)
     if set(sample["rules_sha"]) != {current_sha}:
@@ -443,23 +462,47 @@ def validation_summary(rows: list[dict[str, Any]], current_sha: str) -> dict[str
         },
         "rule_accuracy": validation.rule_accuracy(sample),
         "claim_errors_failed": validation.error_rates(sample),
-        "direct_fcr_readable": _direct(sample),
+        "direct_fcr_readable": _direct(sample, labelled),
         "labeller_models": sorted({m for r in rows for m in r["models"]}),
         "prompt_shas": sorted({s for r in rows for s in r["prompt_shas"]}),
     }
 
 
-def _direct(sample: pd.DataFrame) -> dict[str, dict[str, Any]]:
-    """Design-based FCR: adjudicated labels only, so free of rule error but noisier."""
-    out: dict[str, dict[str, Any]] = {}
-    failed = sample[sample["reward"] == 0]
-    for scaffold, group in failed.groupby("scaffold", sort=True):
-        hits = int((group["adjudicated"] == CLAIM).sum())
-        out[str(scaffold)] = {
+def _direct(sample: pd.DataFrame, labelled: pd.DataFrame) -> dict[str, dict[str, Any]]:
+    """Design-based rates: adjudicated labels only, so free of rule error but noisier.
+
+    Each message counts for its stratum's size over its sample count. Wilson intervals use the
+    Kish effective sample size. `rule_rate_*` show how far the sample's rule rate sits from its
+    population's; the calibrated estimate removes that gap, this one inherits it.
+    """
+    failed = sample[sample["reward"] == 0].copy()
+    failed["weight"] = failed["stratum_n"] / failed.groupby("stratum")["stratum"].transform("size")
+    drawn_from = labelled[
+        (labelled["reward"] == 0) & (labelled["status"] == "readable") & ~labelled["dev"]
+    ]
+
+    def estimate(group: pd.DataFrame, population: pd.DataFrame) -> dict[str, Any]:
+        weight = group["weight"]
+        effective = weight.sum() ** 2 / (weight**2).sum()
+
+        def share(mask: pd.Series) -> float:
+            return float(weight[mask].sum() / weight.sum())
+
+        claim, honest = share(group["adjudicated"] == CLAIM), share(group["adjudicated"] == FAILURE)
+        return {
             "n": len(group),
-            "fcr": hits / len(group),
-            "ci": list(stats.wilson(hits, len(group))),
+            "effective_n": float(effective),
+            "fcr": claim,
+            "ci": list(stats.wilson(claim * effective, effective)),
+            "honest": honest,
+            "honest_ci": list(stats.wilson(honest * effective, effective)),
+            "rule_rate_sample": share(group["rule_label"] == CLAIM),
+            "rule_rate_population": float((population["label"] == CLAIM).mean()),
         }
+
+    out = {"all": estimate(failed, drawn_from)}
+    for scaffold, group in failed.groupby("scaffold", sort=True):
+        out[str(scaffold)] = estimate(group, drawn_from[drawn_from["scaffold"] == scaffold])
     return out
 
 
@@ -474,7 +517,7 @@ def clean(value: Any) -> Any:
     if isinstance(value, int | np.integer):
         return int(value)
     number = float(value)
-    return None if not np.isfinite(number) else round(number, 6)
+    return None if not np.isfinite(number) else round(number, 6) + 0.0
 
 
 def _rates_and_contrasts(
@@ -520,9 +563,15 @@ def run_study(
     log: Callable[[str], None] = print,
 ) -> dict[str, Any]:
     """Regenerate every output under `out` from extracted trials and validation.jsonl."""
-    out.mkdir(parents=True, exist_ok=True)
     labelled = assign_labels(trials)
     payload = labels_jsonl(labelled)
+    block = None
+    validation_path = out / "validation.jsonl"
+    if with_validation and validation_path.exists():
+        rows = read_jsonl(validation_path)
+        block = validation_summary(rows, rules_sha(), labelled)
+        validation.require_current(rows, validation.sample_rows(labelled, rules_sha()))
+    out.mkdir(parents=True, exist_ok=True)
     (out / "labels.jsonl").write_bytes(payload)
     log(f"labels: {len(labelled)} trials")
 
@@ -551,9 +600,7 @@ def run_study(
     coverage(trials).to_csv(out / "coverage.csv", index=False, lineterminator="\n")
 
     rates = None
-    validation_path = out / "validation.jsonl"
-    if with_validation and validation_path.exists():
-        block = validation_summary(read_jsonl(validation_path), rules_sha())
+    if block is not None:
         rates = claim_rates(block["claim_errors_failed"])
         block["rates_used"] = rates
         summary["validation"] = block

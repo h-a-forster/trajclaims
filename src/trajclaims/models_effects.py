@@ -13,6 +13,7 @@ from trajclaims.rules import LABELS
 CLAIM = LABELS[0]
 MIN_SCAFFOLDS = 3
 REPS = 2000
+MIN_TASK_TRIALS = 50
 LEVELS = ("none", "adhoc-check", "test-runner", "task-check")
 
 
@@ -36,8 +37,8 @@ def verification_tables(labelled: pd.DataFrame) -> dict[str, Any]:
     """What failed trials ran, and its association with claiming completion.
 
     Task fixed effects, not the random intercept first planned: harder tasks plausibly draw
-    more checking and more failure, which a random intercept assumes away, and with hundreds of
-    failed trials per task the incidental-parameter bias of fixed effects is negligible.
+    more checking and more failure, which a random intercept assumes away. Tasks with few
+    failed trials carry incidental-parameter bias, so the fits are repeated without them.
     """
     failed = labelled[labelled["reward"] == 0]
     by_scaffold: dict[str, Any] = {}
@@ -81,6 +82,9 @@ def verification_tables(labelled: pd.DataFrame) -> dict[str, Any]:
         for name in LEVELS
     }
     checks = ["adhoc_check", "test_run"]
+    factors = ["scaffold", "model", "task"]
+    per_task = fit_frame.groupby("task")["task"].transform("size")
+    large = fit_frame[per_task >= MIN_TASK_TRIALS]
     totals = {
         key: sum(row[key] for row in by_scaffold.values())
         for key in ("failed", *LEVELS, "after_last_edit")
@@ -92,11 +96,23 @@ def verification_tables(labelled: pd.DataFrame) -> dict[str, Any]:
         "regression_n": len(fit_frame),
         "regression_tasks": int(fit_frame["task"].nunique()),
         "regression_tasks_dropped_constant": int(usable.loc[constant, "task"].nunique()),
+        "regression_trials_per_task": {
+            "median": float(per_task.groupby(fit_frame["task"]).first().median()),
+            "min": int(per_task.min()),
+            "max": int(per_task.max()),
+        },
         "claim_rate_by_level": level_counts,
         "odds_unadjusted": _odds(fit_frame, checks, []),
         "odds_scaffold_model": _odds(fit_frame, checks, ["scaffold", "model"]),
-        "odds_adjusted": _odds(fit_frame, checks, ["scaffold", "model", "task"]),
-        "odds_after_edit": _odds(fit_frame, ["after_edit"], ["scaffold", "model", "task"]),
+        "odds_adjusted": _odds(fit_frame, checks, factors),
+        "odds_after_edit": _odds(fit_frame, ["after_edit"], factors),
+        "large_tasks": {
+            "min_trials": MIN_TASK_TRIALS,
+            "n": len(large),
+            "tasks": int(large["task"].nunique()),
+            "odds_adjusted": _odds(large, checks, factors),
+            "odds_after_edit": _odds(large, ["after_edit"], factors),
+        },
     }
 
 
@@ -118,14 +134,20 @@ def _shares(
         for d, w in zip(draws, w_draws, strict=True)
         if np.isfinite(d).all() and (w > 0).all()
     ]
+    model_draws = np.array([r["row"] for r in replicates])
+    scaffold_draws = np.array([r["col"] for r in replicates])
     between = np.average((y_point - np.average(y_point, weights=w_point)) ** 2, weights=w_point)
     noise = np.average(np.nanvar(draws, axis=0, ddof=1), weights=w_point) / between
     return {
         "model_share": point["row"],
         "scaffold_share": point["col"],
         "rest_share": point["rest"],
-        "model_share_ci": np.quantile([r["row"] for r in replicates], [0.025, 0.975]).tolist(),
-        "scaffold_share_ci": np.quantile([r["col"] for r in replicates], [0.025, 0.975]).tolist(),
+        "model_share_ci": list(stats.bias_corrected(point["row"], model_draws)),
+        "scaffold_share_ci": list(stats.bias_corrected(point["col"], scaffold_draws)),
+        "scaffold_minus_model": point["col"] - point["row"],
+        "scaffold_minus_model_ci": list(
+            stats.bias_corrected(point["col"] - point["row"], scaffold_draws - model_draws)
+        ),
         "noise_over_between": float(noise),
         "replicates": len(replicates),
     }
@@ -141,13 +163,12 @@ def _fixed(
         if len(index) < 2:
             continue
         values = fcr[index]
-        ranges = np.nanmax(draws[:, index], axis=1) - np.nanmin(draws[:, index], axis=1)
         out.append(
             {
                 key: str(name),
                 "cells": {str(o): float(v) for o, v in zip(others[index], values, strict=True)},
                 "range": float(values.max() - values.min()),
-                "range_ci": np.quantile(ranges, [0.025, 0.975]).tolist(),
+                "range_ci": list(stats.range_interval(values, draws[:, index])),
             }
         )
     return out
