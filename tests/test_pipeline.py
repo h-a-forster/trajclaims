@@ -147,6 +147,20 @@ def test_a_bad_message_is_isolated_by_splitting(tmp_path):
     assert len(validation.read_jsonl(out)) == 8
 
 
+def test_a_lone_message_is_retried(tmp_path):
+    calls = []
+
+    def run(argv, stdin):
+        calls.append(stdin)
+        if len(calls) == 1:
+            return json.dumps({"result": '{"labels": {"m1": "claims-done"}}', "modelUsage": {}})
+        return fake_cli([])(argv, stdin)
+
+    out = tmp_path / "labels.jsonl"
+    labellers.run_labeller(labellers.LABELLER_A, sample_rows()[:1], out, run, 1, print)
+    assert len(calls) == 2 and len(validation.read_jsonl(out)) == 1
+
+
 def test_planted_tokens_are_redacted_before_the_sample_is_committed():
     text = validation.redact("Replaced hf_" + "a" * 12 + " and AKIA" + "B" * 16 + " in config.")
     assert text == "Replaced [redacted-token] and [redacted-token] in config."
