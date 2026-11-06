@@ -87,3 +87,9 @@ def test_argv_commands_are_read():
 
 def test_no_agent_steps():
     assert closing("codex", [{"src": "user", "msg": "hi"}]).ending == "none"
+
+
+def test_non_string_arguments_do_not_stop_extraction():
+    for value in (7, {"path": "/app"}):
+        steps = [agent("Reading.", [{"fn": "read_file", "cmd": value}]), agent("Done.")]
+        assert closing("gemini-cli", steps).text == "Done."
