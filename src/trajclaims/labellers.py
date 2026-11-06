@@ -210,9 +210,16 @@ def run_labeller(
     out.parent.mkdir(parents=True, exist_ok=True)
 
     def work(batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        stdout = runner(_argv(labeller), _batch_prompt(labeller, batch))
         ids = [item["id"] for item in batch]
-        labels, models = _parse(stdout, ids)
+        try:
+            stdout = runner(_argv(labeller), _batch_prompt(labeller, batch))
+            labels, models = _parse(stdout, ids)
+        except (LabellerError, ValueError, KeyError, subprocess.TimeoutExpired):
+            if len(batch) == 1:
+                raise
+            # One message can spoil a batch (a refusal, say): split to isolate it.
+            middle = len(batch) // 2
+            return work(batch[:middle]) + work(batch[middle:])
         return [
             {
                 "id": i,
