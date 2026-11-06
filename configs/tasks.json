@@ -1,0 +1,451 @@
+{
+ "commit": "2fd12b88aafdd04a52c298e3940bcb189f9766d6",
+ "repository": "harbor-framework/terminal-bench-2",
+ "tasks": {
+  "adaptive-rejection-sampler": {
+   "agent_timeout_s": 900.0,
+   "category": "scientific-computing",
+   "difficulty": "medium"
+  },
+  "bn-fit-modify": {
+   "agent_timeout_s": 3600.0,
+   "category": "scientific-computing",
+   "difficulty": "hard"
+  },
+  "break-filter-js-from-html": {
+   "agent_timeout_s": 1200.0,
+   "category": "security",
+   "difficulty": "medium"
+  },
+  "build-cython-ext": {
+   "agent_timeout_s": 900.0,
+   "category": "debugging",
+   "difficulty": "medium"
+  },
+  "build-pmars": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "build-pov-ray": {
+   "agent_timeout_s": 12000.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "caffe-cifar-10": {
+   "agent_timeout_s": 1200.0,
+   "category": "machine-learning",
+   "difficulty": "medium"
+  },
+  "cancel-async-tasks": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "chess-best-move": {
+   "agent_timeout_s": 900.0,
+   "category": "games",
+   "difficulty": "medium"
+  },
+  "circuit-fibsqrt": {
+   "agent_timeout_s": 3600.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "cobol-modernization": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "easy"
+  },
+  "code-from-image": {
+   "agent_timeout_s": 1200.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "compile-compcert": {
+   "agent_timeout_s": 2400.0,
+   "category": "system-administration",
+   "difficulty": "medium"
+  },
+  "configure-git-webserver": {
+   "agent_timeout_s": 900.0,
+   "category": "system-administration",
+   "difficulty": "hard"
+  },
+  "constraints-scheduling": {
+   "agent_timeout_s": 1200.0,
+   "category": "personal-assistant",
+   "difficulty": "medium"
+  },
+  "count-dataset-tokens": {
+   "agent_timeout_s": 900.0,
+   "category": "model-training",
+   "difficulty": "medium"
+  },
+  "crack-7z-hash": {
+   "agent_timeout_s": 1800.0,
+   "category": "security",
+   "difficulty": "medium"
+  },
+  "custom-memory-heap-crash": {
+   "agent_timeout_s": 1800.0,
+   "category": "debugging",
+   "difficulty": "medium"
+  },
+  "db-wal-recovery": {
+   "agent_timeout_s": 900.0,
+   "category": "file-operations",
+   "difficulty": "medium"
+  },
+  "distribution-search": {
+   "agent_timeout_s": 3600.0,
+   "category": "machine-learning",
+   "difficulty": "medium"
+  },
+  "dna-assembly": {
+   "agent_timeout_s": 1800.0,
+   "category": "scientific-computing",
+   "difficulty": "hard"
+  },
+  "dna-insert": {
+   "agent_timeout_s": 1800.0,
+   "category": "scientific-computing",
+   "difficulty": "medium"
+  },
+  "extract-elf": {
+   "agent_timeout_s": 900.0,
+   "category": "file-operations",
+   "difficulty": "medium"
+  },
+  "extract-moves-from-video": {
+   "agent_timeout_s": 1800.0,
+   "category": "file-operations",
+   "difficulty": "hard"
+  },
+  "feal-differential-cryptanalysis": {
+   "agent_timeout_s": 1800.0,
+   "category": "mathematics",
+   "difficulty": "hard"
+  },
+  "feal-linear-cryptanalysis": {
+   "agent_timeout_s": 1800.0,
+   "category": "mathematics",
+   "difficulty": "hard"
+  },
+  "filter-js-from-html": {
+   "agent_timeout_s": 1800.0,
+   "category": "security",
+   "difficulty": "medium"
+  },
+  "financial-document-processor": {
+   "agent_timeout_s": 1200.0,
+   "category": "data-processing",
+   "difficulty": "medium"
+  },
+  "fix-code-vulnerability": {
+   "agent_timeout_s": 900.0,
+   "category": "security",
+   "difficulty": "hard"
+  },
+  "fix-git": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "easy"
+  },
+  "fix-ocaml-gc": {
+   "agent_timeout_s": 3600.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "gcode-to-text": {
+   "agent_timeout_s": 900.0,
+   "category": "file-operations",
+   "difficulty": "medium"
+  },
+  "git-leak-recovery": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "git-multibranch": {
+   "agent_timeout_s": 900.0,
+   "category": "system-administration",
+   "difficulty": "medium"
+  },
+  "gpt2-codegolf": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "headless-terminal": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "hf-model-inference": {
+   "agent_timeout_s": 900.0,
+   "category": "data-science",
+   "difficulty": "medium"
+  },
+  "install-windows-3.11": {
+   "agent_timeout_s": 3600.0,
+   "category": "system-administration",
+   "difficulty": "hard"
+  },
+  "kv-store-grpc": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "large-scale-text-editing": {
+   "agent_timeout_s": 1200.0,
+   "category": "file-operations",
+   "difficulty": "medium"
+  },
+  "largest-eigenval": {
+   "agent_timeout_s": 900.0,
+   "category": "mathematics",
+   "difficulty": "medium"
+  },
+  "llm-inference-batching-scheduler": {
+   "agent_timeout_s": 1800.0,
+   "category": "machine-learning",
+   "difficulty": "hard"
+  },
+  "log-summary-date-ranges": {
+   "agent_timeout_s": 900.0,
+   "category": "data-processing",
+   "difficulty": "medium"
+  },
+  "mailman": {
+   "agent_timeout_s": 1800.0,
+   "category": "system-administration",
+   "difficulty": "medium"
+  },
+  "make-doom-for-mips": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "make-mips-interpreter": {
+   "agent_timeout_s": 1800.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "mcmc-sampling-stan": {
+   "agent_timeout_s": 1800.0,
+   "category": "data-science",
+   "difficulty": "hard"
+  },
+  "merge-diff-arc-agi-task": {
+   "agent_timeout_s": 900.0,
+   "category": "debugging",
+   "difficulty": "medium"
+  },
+  "model-extraction-relu-logits": {
+   "agent_timeout_s": 900.0,
+   "category": "mathematics",
+   "difficulty": "hard"
+  },
+  "modernize-scientific-stack": {
+   "agent_timeout_s": 600.0,
+   "category": "scientific-computing",
+   "difficulty": "medium"
+  },
+  "mteb-leaderboard": {
+   "agent_timeout_s": 3600.0,
+   "category": "data-science",
+   "difficulty": "medium"
+  },
+  "mteb-retrieve": {
+   "agent_timeout_s": 1800.0,
+   "category": "data-science",
+   "difficulty": "medium"
+  },
+  "multi-source-data-merger": {
+   "agent_timeout_s": 900.0,
+   "category": "data-processing",
+   "difficulty": "medium"
+  },
+  "nginx-request-logging": {
+   "agent_timeout_s": 900.0,
+   "category": "system-administration",
+   "difficulty": "medium"
+  },
+  "openssl-selfsigned-cert": {
+   "agent_timeout_s": 900.0,
+   "category": "security",
+   "difficulty": "medium"
+  },
+  "overfull-hbox": {
+   "agent_timeout_s": 750.0,
+   "category": "debugging",
+   "difficulty": "easy"
+  },
+  "password-recovery": {
+   "agent_timeout_s": 900.0,
+   "category": "security",
+   "difficulty": "hard"
+  },
+  "path-tracing": {
+   "agent_timeout_s": 1800.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "path-tracing-reverse": {
+   "agent_timeout_s": 1800.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "polyglot-c-py": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "polyglot-rust-c": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "portfolio-optimization": {
+   "agent_timeout_s": 3600.0,
+   "category": "optimization",
+   "difficulty": "medium"
+  },
+  "protein-assembly": {
+   "agent_timeout_s": 1800.0,
+   "category": "scientific-computing",
+   "difficulty": "hard"
+  },
+  "prove-plus-comm": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "easy"
+  },
+  "pypi-server": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "pytorch-model-cli": {
+   "agent_timeout_s": 900.0,
+   "category": "model-training",
+   "difficulty": "medium"
+  },
+  "pytorch-model-recovery": {
+   "agent_timeout_s": 900.0,
+   "category": "model-training",
+   "difficulty": "medium"
+  },
+  "qemu-alpine-ssh": {
+   "agent_timeout_s": 900.0,
+   "category": "system-administration",
+   "difficulty": "medium"
+  },
+  "qemu-startup": {
+   "agent_timeout_s": 900.0,
+   "category": "system-administration",
+   "difficulty": "medium"
+  },
+  "query-optimize": {
+   "agent_timeout_s": 900.0,
+   "category": "data-science",
+   "difficulty": "medium"
+  },
+  "raman-fitting": {
+   "agent_timeout_s": 900.0,
+   "category": "scientific-computing",
+   "difficulty": "medium"
+  },
+  "regex-chess": {
+   "agent_timeout_s": 3600.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "regex-log": {
+   "agent_timeout_s": 900.0,
+   "category": "data-processing",
+   "difficulty": "medium"
+  },
+  "reshard-c4-data": {
+   "agent_timeout_s": 3600.0,
+   "category": "data-science",
+   "difficulty": "medium"
+  },
+  "rstan-to-pystan": {
+   "agent_timeout_s": 1800.0,
+   "category": "data-science",
+   "difficulty": "medium"
+  },
+  "sam-cell-seg": {
+   "agent_timeout_s": 7200.0,
+   "category": "data-science",
+   "difficulty": "hard"
+  },
+  "sanitize-git-repo": {
+   "agent_timeout_s": 900.0,
+   "category": "security",
+   "difficulty": "medium"
+  },
+  "schemelike-metacircular-eval": {
+   "agent_timeout_s": 2400.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "sparql-university": {
+   "agent_timeout_s": 900.0,
+   "category": "data-querying",
+   "difficulty": "hard"
+  },
+  "sqlite-db-truncate": {
+   "agent_timeout_s": 900.0,
+   "category": "debugging",
+   "difficulty": "medium"
+  },
+  "sqlite-with-gcov": {
+   "agent_timeout_s": 900.0,
+   "category": "system-administration",
+   "difficulty": "medium"
+  },
+  "torch-pipeline-parallelism": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "torch-tensor-parallelism": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  },
+  "train-fasttext": {
+   "agent_timeout_s": 3600.0,
+   "category": "model-training",
+   "difficulty": "hard"
+  },
+  "tune-mjcf": {
+   "agent_timeout_s": 900.0,
+   "category": "scientific-computing",
+   "difficulty": "medium"
+  },
+  "video-processing": {
+   "agent_timeout_s": 3600.0,
+   "category": "video-processing",
+   "difficulty": "hard"
+  },
+  "vulnerable-secret": {
+   "agent_timeout_s": 900.0,
+   "category": "security",
+   "difficulty": "medium"
+  },
+  "winning-avg-corewars": {
+   "agent_timeout_s": 3600.0,
+   "category": "software-engineering",
+   "difficulty": "medium"
+  },
+  "write-compressor": {
+   "agent_timeout_s": 900.0,
+   "category": "software-engineering",
+   "difficulty": "hard"
+  }
+ }
+}

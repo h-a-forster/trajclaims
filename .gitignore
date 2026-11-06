@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+# Scratch work
+tmp/
+# Downloaded data and caches (rebuilt with `trajclaims fetch` and `trajclaims extract`)
+data/
+# Run logs
+results/**/progress.log
