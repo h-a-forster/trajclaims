@@ -1,4 +1,4 @@
-"""results/v1/tables.md: the tables REPORT.md quotes, generated, never edited by hand."""
+"""results/v1/tables.md: tables of the study, generated, never edited by hand."""
 
 from __future__ import annotations
 
@@ -20,27 +20,41 @@ def _coverage_rows(table: pd.DataFrame) -> list[str]:
     return lines
 
 
+def _span(value: float, low: float, high: float) -> str:
+    return f"{_pct(value)} ({_pct(low)} to {_pct(high)})"
+
+
 def _rate_rows(table: pd.DataFrame) -> list[str]:
     head = (
-        "| group | failed known | lost | FCR % (95% CI) | if lost silent / claim | bridged "
-        "| FCR readable % | corrected % (95% CI) | honest % | claim given pass % "
-        "| discrimination | false-claim share % |"
+        "| group | failed readable | FCR readable % (95% CI) | calibrated % (95% CI) "
+        "| Rogan-Gladen % (95% CI) | claim given pass % | discrimination | false-claim share % "
+        "| honest of readable % | failed known | lost | FCR % (95% CI) | if lost silent / claim "
+        "| bridged |"
     )
-    lines = [head, "|" + "---|" * 12]
+    lines = [head, "|" + "---|" * 14]
+    calibrated = "fcr_readable_calibrated" in table
     for r in table.itertuples():
-        corrected = "n/a"
-        if "fcr_readable_corrected" in table and not pd.isna(r.fcr_readable_corrected):
-            corrected = (
-                f"{_pct(r.fcr_readable_corrected)} ({_pct(r.fcr_readable_corrected_low)} to "
-                f"{_pct(r.fcr_readable_corrected_high)})"
+        adjusted, corrected = "n/a", "n/a"
+        if calibrated and not pd.isna(r.fcr_readable_calibrated):
+            adjusted = _span(
+                r.fcr_readable_calibrated,
+                r.fcr_readable_calibrated_low,
+                r.fcr_readable_calibrated_high,
+            )
+            corrected = _span(
+                r.fcr_readable_corrected,
+                r.fcr_readable_corrected_low,
+                r.fcr_readable_corrected_high,
             )
         lines.append(
-            f"| {r.group} | {int(r.failed_known)} | {int(r.failed_lost)} "
-            f"| {_pct(r.fcr)} ({_pct(r.fcr_low)} to {_pct(r.fcr_high)}) "
+            f"| {r.group} | {int(r.failed_readable)} "
+            f"| {_span(r.fcr_readable, r.fcr_readable_low, r.fcr_readable_high)} "
+            f"| {adjusted} | {corrected} | {_pct(r.claim_rate_passed_readable)} "
+            f"| {_pct(r.discrimination_readable)} | {_pct(r.false_claim_share)} "
+            f"| {_pct(r.honest_readable)} | {int(r.failed_known)} | {int(r.failed_lost)} "
+            f"| {_span(r.fcr, r.fcr_low, r.fcr_high)} "
             f"| {_pct(r.fcr_if_lost_silent)} / {_pct(r.fcr_if_lost_claim)} "
-            f"| {_pct(r.fcr_bridged)} | {_pct(r.fcr_readable)} | {corrected} | {_pct(r.honest)} "
-            f"| {_pct(r.claim_rate_passed_readable)} "
-            f"| {_pct(r.discrimination_readable)} | {_pct(r.false_claim_share)} |"
+            f"| {_pct(r.fcr_bridged)} |"
         )
     return lines
 
@@ -50,7 +64,13 @@ def write_tables(out: Path) -> None:
     coverage = pd.read_csv(out / "coverage.csv")
     lines = ["# Generated tables", "", "Written by `trajclaims study`. Do not edit.", ""]
     lines += ["## Coverage", "", *_coverage_rows(coverage), ""]
-    for level, title in (("scaffold", "Per scaffold"), ("model", "Per model"), ("cell", "Cells")):
-        table = fcr[(fcr["level"] == level) & fcr["reportable"]]
+    levels = (
+        ("all", "All scaffolds"),
+        ("scaffold", "Per scaffold"),
+        ("model", "Per model"),
+        ("cell", "Cells"),
+    )
+    for level, title in levels:
+        table = fcr[(fcr["level"] == level) & fcr["reportable_readable"]]
         lines += [f"## {title}", "", *_rate_rows(table), ""]
     (out / "tables.md").write_text("\n".join(lines), encoding="utf-8", newline="\n")

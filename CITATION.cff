@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use trajclaims, please cite it as below."
+title: trajclaims
+abstract: >-
+  False-completion audit of public Terminal-Bench 2 trajectories: what coding agents claim at the
+  end of a run against what the verifier found, across scaffolds and models, with validated
+  labels and task-clustered intervals.
+type: software
+authors:
+  - name: h-a-forster
+repository-code: "https://github.com/h-a-forster/trajclaims"
+license: MIT
+version: 0.1.0
+date-released: "2026-11-06"
+keywords:
+  - llm evaluation
+  - agent evaluation
+  - false completion
+  - terminal-bench
+  - measurement error
+references:
+  - type: article
+    authors:
+      - family-names: Advani
+        given-names: Laksh
+    title: "From Confident Closing to Silent Failure: Characterizing False Success in LLM Agents"
+    year: 2026
+    notes: arXiv:2606.09863
+  - type: software
+    authors:
+      - name: h-a-forster
+    title: overclaim
+    repository-code: "https://github.com/h-a-forster/overclaim"

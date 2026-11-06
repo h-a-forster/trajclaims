@@ -21,6 +21,14 @@ def test_rogan_gladen_recovers_a_known_prevalence():
     assert stats.rogan_gladen(observed, se, sp) == pytest.approx(truth)
 
 
+def test_calibration_recovers_a_known_prevalence():
+    truth, se, sp = 0.7, 0.9, 0.8
+    said_yes = truth * se + (1 - truth) * (1 - sp)
+    ppv = truth * se / said_yes
+    npv = (1 - truth) * sp / (1 - said_yes)
+    assert stats.calibrated(said_yes, ppv, npv) == pytest.approx(truth)
+
+
 def test_kappa_known_values():
     assert stats.cohen_kappa(["a", "b"], ["a", "b"]) == pytest.approx(1.0)
     assert stats.cohen_kappa(["a", "a", "b", "b"], ["a", "b", "a", "b"]) == pytest.approx(0.0)

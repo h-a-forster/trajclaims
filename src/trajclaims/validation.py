@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import zlib
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,9 @@ SEED = 20261106
 PER_FAILED = 60
 PER_PASSED = 20
 KEY = ["task", "scaffold", "model_raw", "trial"]
+TOKEN = re.compile(
+    r"AKIA[0-9A-Z]{12,}|gh[pousr]_[A-Za-z0-9]{10,}|hf_[A-Za-z0-9]{10,}|sk-[A-Za-z0-9-]{16,}"
+)
 
 
 def is_dev(frame: pd.DataFrame) -> pd.Series:
@@ -47,6 +51,11 @@ def draw(labelled: pd.DataFrame) -> pd.DataFrame:
     sample = pd.concat(parts, ignore_index=True)
     sample["id"] = [item_id(row) for row in sample.itertuples()]
     return sample
+
+
+def redact(text: str) -> str:
+    """Hide token-shaped strings. Tasks plant fake credentials, and closings can quote them."""
+    return TOKEN.sub("[redacted-token]", text)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:

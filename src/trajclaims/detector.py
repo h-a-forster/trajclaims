@@ -25,6 +25,7 @@ SEED = 20261106
 FOLDS = 5
 REPS = 2000
 MIN_CLASS = 20
+MIN_CELL_CLASS = 5
 DETECTOR_SCHEMA = 1
 
 
@@ -76,6 +77,32 @@ def _fold_scores(
     return scores
 
 
+def _pair_scores(
+    frame: pd.DataFrame, name: str, train: np.ndarray, test: np.ndarray, unit_dir: Path
+) -> np.ndarray:
+    """Closing-text scores for an explicit train and test split, cached as a unit."""
+    unit = unit_dir / f"s{DETECTOR_SCHEMA}-closing-{name}.json"
+    if unit.exists():
+        return np.array(json.loads(unit.read_text(encoding="utf-8")))
+    y = frame.loc[train, "failed"].to_numpy()
+    scores = _tfidf_scores(frame.loc[train, "closing"], y, frame.loc[test, "closing"])
+    part = unit.with_suffix(".part")
+    part.write_text(json.dumps([round(float(s), 6) for s in scores]), encoding="utf-8")
+    os.replace(part, unit)
+    return scores
+
+
+def _pooled_folds(y: np.ndarray, scores: np.ndarray, folds: np.ndarray) -> float:
+    """Trial-weighted AUROC within folds, so scores of different models are not compared."""
+    total = weight = 0.0
+    for fold in np.unique(folds):
+        ys = y[folds == fold]
+        if 0 < ys.sum() < len(ys):
+            total += len(ys) * weighted_auroc(ys, scores[folds == fold], np.ones(len(ys)))
+            weight += len(ys)
+    return total / weight if weight else float("nan")
+
+
 def out_of_fold(frame: pd.DataFrame, feature: str, folds: np.ndarray, unit_dir: Path) -> np.ndarray:
     scores = np.zeros(len(frame))
     for fold in np.unique(folds):
@@ -84,19 +111,23 @@ def out_of_fold(frame: pd.DataFrame, feature: str, folds: np.ndarray, unit_dir: 
     return scores
 
 
-def _within_cells(frame: pd.DataFrame, scores: np.ndarray) -> tuple[float, int]:
-    """Mean AUROC inside scaffold x model cells, weighted by trials: style cannot help here."""
+def _within_cells(frame: pd.DataFrame, scores: np.ndarray, folds: np.ndarray) -> tuple[float, int]:
+    """Mean AUROC inside scaffold x model x fold, weighted by trials.
+
+    Scaffold and model style cannot help inside a cell, and scores from different folds' models
+    are never compared.
+    """
     total = weight = 0.0
-    cells = 0
+    used = set()
     y = frame["failed"].to_numpy()
-    for _, index in frame.groupby(["scaffold", "model"]).indices.items():
+    for key, index in frame.groupby(["scaffold", "model", folds]).indices.items():
         ys = y[index]
-        if min(ys.sum(), len(ys) - ys.sum()) < MIN_CLASS:
+        if min(ys.sum(), len(ys) - ys.sum()) < MIN_CELL_CLASS:
             continue
         total += len(ys) * weighted_auroc(ys, scores[index], np.ones(len(ys)))
         weight += len(ys)
-        cells += 1
-    return (total / weight if weight else float("nan")), cells
+        used.add(key[:2])
+    return (total / weight if weight else float("nan")), len(used)
 
 
 def run(
@@ -119,7 +150,7 @@ def run(
         scores = out_of_fold(frame, feature, folds, unit_dir)
         draws = auroc_draws(y, scores, tasks, REPS, SEED)
         low, high = percentile(draws)
-        within, cells = _within_cells(frame, scores)
+        within, cells = _within_cells(frame, scores, folds)
         results[feature] = {
             "auroc": weighted_auroc(y, scores, np.ones(len(y))),
             "ci": [float(low), float(high)],
@@ -127,8 +158,9 @@ def run(
             "within_cells": cells,
         }
         log(f"detector {feature}: {results[feature]}")
-    # Leave one scaffold out: does the signal transfer to a scaffold the detector never saw?
-    held: dict[str, float] = {}
+    # Leave one scaffold out. Holding out tasks as well matters: the same tasks in training lets
+    # the detector recognise hard tasks by their vocabulary, a leak task-disjoint folds prevent.
+    held: dict[str, dict[str, float]] = {}
     codes = pd.factorize(frame["scaffold"], sort=True)[0]
     names = sorted(frame["scaffold"].unique())
     for code, name in enumerate(names):
@@ -136,7 +168,15 @@ def run(
         ys = y[mask]
         if len(names) < 2 or min(ys.sum(), len(ys) - ys.sum()) < MIN_CLASS:
             continue
-        scores = _fold_scores(frame, "closing", f"loso-{name}", mask, unit_dir)
-        held[name] = weighted_auroc(ys, scores, np.ones(len(ys)))
+        leaky = _fold_scores(frame, "closing", f"loso-{name}", mask, unit_dir)
+        clean = np.zeros(len(frame))
+        for fold in np.unique(folds):
+            test = mask & (folds == fold)
+            train = ~mask & (folds != fold)
+            clean[test] = _pair_scores(frame, f"lost-{name}-{fold}", train, test, unit_dir)
+        held[name] = {
+            "tasks_shared": weighted_auroc(ys, leaky, np.ones(len(ys))),
+            "tasks_held_out": _pooled_folds(ys, clean[mask], folds[mask]),
+        }
     results["leave_one_scaffold_out"] = held
     return results

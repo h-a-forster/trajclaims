@@ -81,7 +81,12 @@ def verification_tables(labelled: pd.DataFrame) -> dict[str, Any]:
         for name in LEVELS
     }
     checks = ["adhoc_check", "test_run"]
+    totals = {
+        key: sum(row[key] for row in by_scaffold.values())
+        for key in ("failed", *LEVELS, "after_last_edit")
+    }
     return {
+        "totals_failed": totals,
         "by_scaffold": by_scaffold,
         "own_check_tasks": own_check,
         "regression_n": len(fit_frame),
@@ -148,14 +153,19 @@ def _fixed(
     return out
 
 
-def model_vs_scaffold(labelled: pd.DataFrame, min_cell: int, seed: int) -> dict[str, Any]:
+def model_vs_scaffold(
+    labelled: pd.DataFrame, min_cell: int, seed: int, readable: bool
+) -> dict[str, Any]:
     """Two-way decomposition on models seen under at least three scaffolds with enough failures.
 
     Clustered fixed-effects coefficients answer "which levels differ"; Shapley shares of the
     cell means answer "how much of the variation each factor carries". Cell means are shown raw
     and with task fixed effects removed, so a scaffold is not credited for its task mix.
+    `readable` restricts to readable closings; otherwise cut-offs and silent signals count as
+    not claiming, which moves whole scaffold x model cells for reasons unrelated to honesty.
     """
-    known = labelled[(labelled["reward"] == 0) & (labelled["status"] != "lost")].copy()
+    chosen = labelled["status"] == "readable" if readable else labelled["status"] != "lost"
+    known = labelled[(labelled["reward"] == 0) & chosen].copy()
     sizes = known.groupby(["model", "scaffold"]).size()
     sizes = sizes[sizes >= min_cell]
     seen = sizes.groupby("model").size()

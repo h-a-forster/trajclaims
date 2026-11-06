@@ -24,9 +24,6 @@ SIGNAL_SCAFFOLDS = frozenset({"terminus-2", "terminus-3-3", "mini-swe-agent"})
 # partial scrape blanks that argument, so a `finish` with no text is a lost message, not silence.
 BOILERPLATE = frozenset({"All done! What's next on the agenda?"})
 
-ENDINGS = ("declared", "stopped", "cutoff", "unknown", "none")
-STATUSES = ("readable", "lost", "no-text", "cutoff")
-
 
 @dataclass(frozen=True, slots=True)
 class Closing:

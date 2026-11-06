@@ -138,16 +138,37 @@ def _corrected_cells(
     rng = np.random.default_rng(seed)
     reps = weights.shape[0]
     se, sp, se_point, sp_point = {}, {}, {}, {}
+    ppv, npv, ppv_point, npv_point = {}, {}, {}, {}
     for name in sorted(set(scaffolds)):
         counts = rates.get(name, rates["*"])
         se[name] = stats.beta_draws(counts["true_pos"], counts["pos"], reps, rng)
         sp[name] = stats.beta_draws(counts["true_neg"], counts["neg"], reps, rng)
         se_point[name] = counts["true_pos"] / counts["pos"]
         sp_point[name] = counts["true_neg"] / counts["neg"]
+        false_pos, false_neg = (
+            counts["neg"] - counts["true_neg"],
+            counts["pos"] - counts["true_pos"],
+        )
+        said_yes, said_no = counts["true_pos"] + false_pos, counts["true_neg"] + false_neg
+        ppv[name] = stats.beta_draws(counts["true_pos"], said_yes, reps, rng)
+        npv[name] = stats.beta_draws(counts["true_neg"], said_no, reps, rng)
+        ppv_point[name] = counts["true_pos"] / said_yes
+        npv_point[name] = counts["true_neg"] / said_no
     se_draws = np.column_stack([se[s] for s in scaffolds])
     sp_draws = np.column_stack([sp[s] for s in scaffolds])
     seen_draws = weights @ den
-    corrected = stats.rogan_gladen(stats.ratio_draws(num, den, weights), se_draws, sp_draws)
+    rate_draws = stats.ratio_draws(num, den, weights)
+    corrected = stats.rogan_gladen(rate_draws, se_draws, sp_draws)
+    calibrated = stats.calibrated(
+        rate_draws,
+        np.column_stack([ppv[s] for s in scaffolds]),
+        np.column_stack([npv[s] for s in scaffolds]),
+    )
+    calibrated_point = stats.calibrated(
+        num.sum(0) / den.sum(0),
+        np.array([ppv_point[s] for s in scaffolds]),
+        np.array([npv_point[s] for s in scaffolds]),
+    )
     point = stats.rogan_gladen(
         num.sum(0) / den.sum(0),
         np.array([se_point[s] for s in scaffolds]),
@@ -159,6 +180,8 @@ def _corrected_cells(
         "seen_draws": seen_draws,
         "count": np.clip(point, 0.0, 1.0) * den.sum(0),
         "count_draws": np.clip(corrected, 0.0, 1.0) * seen_draws,
+        "calibrated": calibrated_point * den.sum(0),
+        "calibrated_draws": calibrated * seen_draws,
     }
 
 
@@ -167,10 +190,15 @@ def rate_table(
     level: str,
     weights: np.ndarray,
     rates: dict[str, dict[str, Any]] | None,
-    bridge_rate: float,
-) -> tuple[pd.DataFrame, np.ndarray]:
-    """Rates per group at one level, plus the FCR draws for contrasts."""
-    group = frame["scaffold"] + "|" + frame["model"] if level == "cell" else frame[level]
+    bridge_rates: dict[str, float],
+) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
+    """Rates per group at one level, plus the draws of each rate that gets contrasts."""
+    if level == "all":
+        group = pd.Series("all", index=frame.index)
+    elif level == "cell":
+        group = frame["scaffold"] + "|" + frame["model"]
+    else:
+        group = frame[level]
     groups = pd.Index(sorted(group.unique()))
     tasks = pd.Index(sorted(frame["task"].unique()))
     is_failed = (frame["reward"] == 0).to_numpy()
@@ -189,10 +217,14 @@ def rate_table(
     read = count(is_failed & is_read)
     known = claims + hedged + fails + silent
     fcr_draws = stats.ratio_draws(claims, known, weights)
+    read_draws = stats.ratio_draws(claims, read, weights)
     fcr_low, fcr_high = stats.percentile(fcr_draws)
-    read_low, read_high = stats.percentile(stats.ratio_draws(claims, read, weights))
+    read_low, read_high = stats.percentile(read_draws)
     honest_low, honest_high = stats.percentile(stats.ratio_draws(fails, known, weights))
     k, n, l_, r = claims.sum(0), known.sum(0), lost.sum(0), read.sum(0)
+    lost_rows = is_failed & is_lost
+    rate = frame.loc[lost_rows, "scaffold"].map(bridge_rates).fillna(bridge_rates["*"])
+    expected = rate.groupby(group[lost_rows].to_numpy()).sum().reindex(groups, fill_value=0.0)
     declared = count(is_failed & (frame["ending"] == "declared").to_numpy()).sum(0)
     pass_claims = count(~is_failed & (lab == CLAIM)).sum(0)
     pass_read = count(~is_failed & is_read).sum(0)
@@ -214,13 +246,14 @@ def rate_table(
                 "fcr_high": fcr_high,
                 "fcr_if_lost_silent": k / (n + l_),
                 "fcr_if_lost_claim": (k + l_) / (n + l_),
-                "fcr_bridged": (k + bridge_rate * l_) / (n + l_),
+                "fcr_bridged": (k + expected.to_numpy()) / (n + l_),
                 "fcr_readable": k / r,
                 "fcr_readable_low": read_low,
                 "fcr_readable_high": read_high,
                 "honest": fails.sum(0) / n,
                 "honest_low": honest_low,
                 "honest_high": honest_high,
+                "honest_readable": fails.sum(0) / r,
                 "declared_rate_failed": declared / (n + l_),
                 "claim_rate_passed_readable": pass_claims / pass_read,
                 "discrimination_readable": pass_claims / pass_read - k / r,
@@ -228,9 +261,10 @@ def rate_table(
             }
         )
     table["reportable"] = table["failed_known"] >= MIN_CELL
+    table["reportable_readable"] = table["failed_readable"] >= MIN_CELL
     if rates is not None:
         _add_corrected(table, frame, level, rates, weights)
-    return table, fcr_draws
+    return table, {"fcr": fcr_draws, "fcr_readable": read_draws}
 
 
 def _add_corrected(
@@ -244,6 +278,7 @@ def _add_corrected(
     block = _corrected_cells(frame, rates, weights, SEED + 1)
     cells = block["cells"]
     key = {
+        "all": ["all"] * len(cells),
         "scaffold": [c.split("|")[0] for c in cells],
         "model": [c.split("|")[1] for c in cells],
         "cell": list(cells),
@@ -257,6 +292,12 @@ def _add_corrected(
     table["fcr_readable_corrected"] = corrected
     table["fcr_readable_corrected_low"] = low
     table["fcr_readable_corrected_high"] = high
+    with np.errstate(divide="ignore", invalid="ignore"):
+        table["fcr_readable_calibrated"] = (rows.T @ block["calibrated"]) / (rows.T @ block["seen"])
+        draws = (block["calibrated_draws"] @ rows) / (block["seen_draws"] @ rows)
+    low, high = stats.percentile(draws)
+    table["fcr_readable_calibrated_low"] = low
+    table["fcr_readable_calibrated_high"] = high
     table["fcr_corrected"] = corrected * table["failed_readable"] / table["failed_known"]
 
 
@@ -288,7 +329,8 @@ def bridge(labelled: pd.DataFrame) -> dict[str, Any]:
     kept_claims = int((kept["label"] == CLAIM).sum())
     paired = twins[(twins["partial_status"] == "readable") & (twins["status"] == "readable")]
     relabelled = [label(text)[0] for text in paired["partial_text"]]
-    agreement = float(np.mean(np.array(relabelled) == paired["label"].to_numpy()))
+    same = np.array(relabelled, dtype=str) == paired["label"].to_numpy(dtype=str)
+    agreement = float(same.mean()) if len(same) else 0.0
     return {
         "pairs": len(twins),
         "rows": rows,
@@ -301,7 +343,25 @@ def bridge(labelled: pd.DataFrame) -> dict[str, Any]:
         "claim_rate_kept": kept_claims / len(kept) if len(kept) else 0.0,
         "paired_text_pairs": len(paired),
         "paired_label_agreement": agreement,
+        "lost_claim_rate_used": _bridge_rates(rows),
     }
+
+
+def _bridge_rates(rows: list[dict[str, Any]]) -> dict[str, float]:
+    """Claim rate among failed messages the partial scrape lost, per bridged scaffold.
+
+    Scaffolds outside the bridge get `*`, the rate over the bridged scaffolds whose closings are
+    prose: mini-swe-agent's long closings are mostly code, unlike a long claude-code summary.
+    """
+    lost = [r for r in rows if r["partial_status"] == "lost" and r["reward"] == 0]
+    rates = {r["scaffold"]: r["claims_done"] / r["readable_in_full"] for r in lost}
+    prose = [r for r in lost if r["scaffold"] != "mini-swe-agent"]
+    claims, readable = (
+        sum(r["claims_done"] for r in prose),
+        sum(r["readable_in_full"] for r in prose),
+    )
+    rates["*"] = claims / readable if readable else 0.0
+    return rates
 
 
 def sensitivity(labelled: pd.DataFrame, trials: pd.DataFrame) -> dict[str, Any]:
@@ -324,7 +384,17 @@ def sensitivity(labelled: pd.DataFrame, trials: pd.DataFrame) -> dict[str, Any]:
     repeats = texts.groupby(["scaffold", "closing_text"])["closing_text"].transform("size")
     template = repeats >= 10
     phrase = texts["closing_text"].str.contains(r"(?i)task (?:is |has been )?(?:now )?complete")
+    has_steps = labelled[labelled["ending"] != "none"]
+    ending_check = {
+        str(ending): {
+            "n": len(group),
+            "fail_rate": float((group["reward"] == 0).mean()),
+            "at_timeout": float(group["timed_out"].mean()),
+        }
+        for ending, group in has_steps.groupby("ending", sort=True)
+    }
     return {
+        "ending_check": ending_check,
         "never_solved_tasks": never,
         "rarely_solved_tasks": rare,
         "excluding_rarely_solved": by(known[~known["task"].isin(rare)]),
@@ -410,28 +480,32 @@ def clean(value: Any) -> Any:
 def _rates_and_contrasts(
     labelled: pd.DataFrame,
     rates: dict[str, dict[str, Any]] | None,
-    bridge_rate: float,
+    bridge_rates: dict[str, float],
     out: Path,
     summary: dict[str, Any],
 ) -> None:
     weights = stats.task_weights(labelled["task"].nunique(), REPS, SEED)
     tables = []
-    for level in ("scaffold", "model", "cell"):
-        table, draws = rate_table(labelled, level, weights, rates, bridge_rate)
+    for level in ("all", "scaffold", "model", "cell"):
+        table, draws = rate_table(labelled, level, weights, rates, bridge_rates)
         tables.append(table)
-        if level != "cell":
-            continue
-        keep = table["reportable"].to_numpy()
-        pairs = stats.contrasts(table.loc[keep, "fcr"].to_numpy(), draws[:, keep])
+    frames = []
+    counts: dict[str, Any] = {}
+    for metric, flag in (("fcr", "reportable"), ("fcr_readable", "reportable_readable")):
+        keep = table[flag].to_numpy()
+        pairs = stats.contrasts(table.loc[keep, metric].to_numpy(), draws[metric][:, keep])
         names = table.loc[keep, "group"].to_numpy()
-        pairs["left"] = names[pairs["left"]]
-        pairs["right"] = names[pairs["right"]]
-        pairs.round(6).to_csv(out / "contrasts.csv", index=False, lineterminator="\n")
-        summary["contrasts"] = {
+        pairs["left"], pairs["right"] = names[pairs["left"]], names[pairs["right"]]
+        pairs.insert(0, "metric", metric)
+        frames.append(pairs)
+        counts[metric] = {
             "cells": int(keep.sum()),
             "pairs": len(pairs),
             "holm_significant_05": int((pairs["p_holm"] < 0.05).sum()),
         }
+    summary["contrasts"] = counts
+    all_pairs = pd.concat(frames, ignore_index=True)
+    all_pairs.round(6).to_csv(out / "contrasts.csv", index=False, lineterminator="\n")
     fcr = pd.concat(tables, ignore_index=True)
     fcr.round(6).to_csv(out / "fcr.csv", index=False, lineterminator="\n")
 
@@ -484,11 +558,14 @@ def run_study(
         block["rates_used"] = rates
         summary["validation"] = block
 
-    _rates_and_contrasts(labelled, rates, twins["claim_rate_lost"], out, summary)
+    _rates_and_contrasts(labelled, rates, twins["lost_claim_rate_used"], out, summary)
     log("rates and contrasts done")
     summary["verification"] = models_effects.verification_tables(labelled)
     log("verification done")
-    summary["model_vs_scaffold"] = models_effects.model_vs_scaffold(labelled, MIN_CELL, SEED + 2)
+    summary["model_vs_scaffold"] = {
+        "readable": models_effects.model_vs_scaffold(labelled, MIN_CELL, SEED + 2, readable=True),
+        "known": models_effects.model_vs_scaffold(labelled, MIN_CELL, SEED + 2, readable=False),
+    }
     log("decomposition done")
     summary["sensitivity"] = sensitivity(labelled, trials)
     if with_detector:

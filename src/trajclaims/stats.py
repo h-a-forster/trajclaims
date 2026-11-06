@@ -74,6 +74,15 @@ def rogan_gladen(p: np.ndarray, se: np.ndarray, sp: np.ndarray) -> np.ndarray:
         return (p + sp - 1) / (se + sp - 1)
 
 
+def calibrated(p: np.ndarray, ppv: np.ndarray, npv: np.ndarray) -> np.ndarray:
+    """Prevalence from the rule rate and its predictive values (inverse calibration).
+
+    Uses the same validation counts as Rogan-Gladen, read the other way. It does not depend on
+    the validation sample's own rule rate matching the population's, and stays within [0, 1].
+    """
+    return p * ppv + (1 - p) * (1 - npv)
+
+
 def beta_draws(hits: int, total: int, reps: int, rng: np.random.Generator) -> np.ndarray:
     """Jeffreys posterior draws of a proportion, to carry validation-sample noise."""
     return rng.beta(hits + 0.5, total - hits + 0.5, size=reps)

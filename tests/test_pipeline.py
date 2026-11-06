@@ -111,9 +111,7 @@ def test_scrape_references_do_not_reach_detector_text():
 
 
 def sample_rows():
-    return [
-        {"id": f"m{i}", "text": "reward secret scaffold secret"[:6] + str(i)} for i in range(45)
-    ]
+    return [{"id": f"m{i}", "text": f"message {i}"} for i in range(45)]
 
 
 def fake_cli(prompts):
@@ -147,6 +145,11 @@ def test_a_bad_message_is_isolated_by_splitting(tmp_path):
     out = tmp_path / "labels.jsonl"
     labellers.run_labeller(labellers.LABELLER_B, sample_rows()[:8], out, run, 1, print)
     assert len(validation.read_jsonl(out)) == 8
+
+
+def test_planted_tokens_are_redacted_before_the_sample_is_committed():
+    text = validation.redact("Replaced hf_" + "a" * 12 + " and AKIA" + "B" * 16 + " in config.")
+    assert text == "Replaced [redacted-token] and [redacted-token] in config."
 
 
 def test_a_prompt_cannot_change_silently():
@@ -189,3 +192,64 @@ def test_the_detector_keeps_tasks_disjoint_and_reports_cells(tmp_path):
     assert result["closing"]["auroc"] == pytest.approx(1.0)
     assert result["ids"]["auroc"] == pytest.approx(0.5)
     assert result["closing"]["within_cells"] == 1
+
+
+def test_study_outputs_regenerate_byte_identically(tmp_path, monkeypatch):
+    names = [f"t{i}" for i in range(12)]
+    monkeypatch.setattr(data, "load_tasks", lambda: {n: {"agent_timeout_s": 900.0} for n in names})
+    texts = ["Done. Wrote the file.", "I cannot complete the task.", "Let me check."]
+    rows = []
+    for i in range(1200):
+        tool = [{"fn": "shell", "cmd": "pytest" if i % 5 == 0 else "ls"}]
+        steps = [
+            {"src": "agent", "msg": "", "tools": tool, "obs": "ok"},
+            {"src": "agent", "msg": texts[i % 7 % 3], "tools": None, "obs": None},
+        ]
+        rows.append(
+            row(
+                task_name=names[i % 12],
+                agent=("codex", "claude-code")[i % 2],
+                model=("gpt-5@openai", "gpt-5-mini@openai")[i % 3 % 2],
+                reward=int(i % 4 == 0),
+                trial_name=f"trial{i}",
+                steps=json.dumps(steps),
+            )
+        )
+    units = built(tmp_path, rows)
+    trials, counts = data.load_trials(units)
+    outputs = []
+    for run in ("one", "two"):
+        out = tmp_path / run
+        study.run_study(
+            trials,
+            counts,
+            out,
+            tmp_path / "unused",
+            with_validation=False,
+            with_detector=False,
+            log=lambda _: None,
+        )
+        outputs.append({p.name: p.read_bytes() for p in out.iterdir()})
+    assert outputs[0] == outputs[1]
+    assert set(outputs[0]) >= {"labels.jsonl", "fcr.csv", "summary.json", "contrasts.csv"}
+
+
+def test_bridge_rates_keep_code_heavy_closings_out_of_the_prose_rate():
+    def bridged(scaffold, claims, readable):
+        return {
+            "scaffold": scaffold,
+            "reward": 0,
+            "partial_status": "lost",
+            "readable_in_full": readable,
+            "claims_done": claims,
+        }
+
+    rates = study._bridge_rates(
+        [
+            bridged("mini-swe-agent", 1, 100),
+            bridged("openhands", 80, 100),
+            bridged("terminus-2", 60, 100),
+        ]
+    )
+    assert rates["mini-swe-agent"] == pytest.approx(0.01)
+    assert rates["*"] == pytest.approx(0.7)

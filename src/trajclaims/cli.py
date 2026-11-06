@@ -94,6 +94,7 @@ def cmd_label(args: argparse.Namespace) -> int:
         merged.append(
             {
                 **row,
+                "text": validation.redact(row["text"]),
                 "label_a": left[i]["label"],
                 "label_b": right[i]["label"],
                 "adjudicated": left[i]["label"] if agree else final[i]["label"],
