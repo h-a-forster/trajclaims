@@ -18,12 +18,15 @@ and task-clustered intervals.
   reference for the regression tests.
 - `rules.py` is frozen for `results/v1`. Any change voids the validation: `study` refuses, by
   design. A new rule version needs a new `results/v<n>` and a new sample.
+- An extraction change that moves closings between strata leaves the rules valid and the sample
+  stale. `study` refuses that too, until `trajclaims sample --extend` and `trajclaims label` cover
+  the new strata.
 - The study makes no model calls. Only `trajclaims label` does, and its output is committed.
 - Every stochastic function takes a seed. `summary.json`, `fcr.csv`, `contrasts.csv` and
   `labels.jsonl` regenerate byte for byte.
 - Validate before writing; raise `DataError`. Count every excluded trial.
 - Long work is unit files written atomically: `data/units/` per row group, `data/detector/` per
-  fold, and labeller answers appended per batch. Finished units are skipped; `--force` rebuilds
+  fold under a hash of the inputs, and labeller answers appended per batch. Finished units are skipped; `--force` rebuilds
   extraction. Bump `EXTRACT_SCHEMA` or `DETECTOR_SCHEMA` when output changes.
 - `data/` and `tmp/` are gitignored. Never commit raw shards.
 - Commits and PRs carry no generated-by trailers. CI runs only on pull requests and manual
@@ -71,7 +74,8 @@ uv run trajclaims study       # regenerates results/v1 from the committed valida
 uv run trajclaims check       # labels byte-identical to the committed file
 ```
 
-`trajclaims sample` and `trajclaims label` produced `validation.jsonl` once; they need the
-`claude` CLI and are not part of a rerun.
+`trajclaims sample` and `trajclaims label` produced `validation.jsonl`; `label` needs the
+`claude` CLI, and neither is part of a rerun. `sample --extend` adds strata, and `label` asks only
+about unlabelled messages, which needs the raw answers in `data/validation`.
 
 Open work lives in `backlog.md`. Findings are in `README.md`; every figure is in `results/v1`.
