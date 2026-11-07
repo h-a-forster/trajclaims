@@ -15,6 +15,13 @@ def test_holm_matches_statsmodels():
     assert stats.holm(p) == pytest.approx(multipletests(p, method="holm")[1])
 
 
+def test_holm_nan_stays_nan_and_leaves_the_family():
+    nan = np.nan
+    assert stats.holm([0.01, nan, 0.02]) == pytest.approx([0.02, nan, 0.02], nan_ok=True)
+    assert stats.holm([nan, 0.01, 0.02]) == pytest.approx([nan, 0.02, 0.02], nan_ok=True)
+    assert stats.holm([nan, nan]) == pytest.approx([nan, nan], nan_ok=True)
+
+
 def test_rogan_gladen_recovers_a_known_prevalence():
     truth, se, sp = 0.7, 0.9, 0.8
     observed = truth * se + (1 - truth) * (1 - sp)

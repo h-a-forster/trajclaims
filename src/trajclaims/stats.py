@@ -65,12 +65,16 @@ def range_interval(point: np.ndarray, draws: np.ndarray) -> tuple[float, float]:
 
 
 def holm(pvalues: np.ndarray) -> np.ndarray:
-    """Holm step-down adjusted p-values, in input order."""
+    """Holm step-down adjusted p-values, in input order.
+
+    NaN entries stay NaN and do not count toward the family size.
+    """
     p = np.asarray(pvalues, dtype=float)
-    order = np.argsort(p)
-    scaled = (len(p) - np.arange(len(p))) * p[order]
+    kept = np.flatnonzero(~np.isnan(p))
+    order = kept[np.argsort(p[kept])]
+    scaled = (len(kept) - np.arange(len(kept))) * p[order]
     adjusted = np.minimum(np.maximum.accumulate(scaled), 1.0)
-    out = np.empty(len(p))
+    out = np.full_like(p, np.nan)
     out[order] = adjusted
     return out
 
