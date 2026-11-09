@@ -12,3 +12,4 @@ tmp/
 data/
 # Run logs
 results/**/progress.log
+backlog.md

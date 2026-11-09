@@ -33,6 +33,5 @@ a test that fails without it.
 - Regenerate results with `uv run trajclaims study`; never edit them by hand.
 - Never commit raw downloads or caches (`data/`, `tmp/`).
 - Add change notes to `docs/release-notes-<version>.md`, not to a CHANGELOG.
-- Keep [backlog.md](backlog.md) current: one line per open item.
 
 Security issues: see [SECURITY.md](SECURITY.md).
