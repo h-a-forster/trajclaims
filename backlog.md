@@ -5,7 +5,6 @@
 ## Waiting on me
 
 - Decide whether trajclaims goes public; it stays private until then.
-- Merge branch `audit-fixes` into `main`: it corrects the study's headline figures.
 - Write REPORT.md or waive it: the harness refused the subagent's write of a report file, so findings are in the README and `results/v1`, and a draft was not committed.
 
 ## Decided
