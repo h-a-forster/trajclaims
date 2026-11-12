@@ -180,7 +180,7 @@ Two independent audits on 2026-11-06 led to the fixes in
 
 | Finding | Decision |
 |---|---|
-| CI has never run | Rejected. CI runs on pull requests and manual dispatch because private-repo minutes are metered. The suite was run locally instead. |
+| CI has never run | Rejected at the time, when private-repo minutes were metered and the suite was run locally. Since the repository went public, CI runs on pushes to main as well as pull requests and manual dispatch. |
 | Task-adjusted share intervals hold task effects at their full-sample estimates | Kept as a limit. Refitting per replicate would cost 2,000 regressions for a figure the README does not quote, so read them as slightly narrow. |
 | `odds_unadjusted` is fitted on the sample trimmed for task fixed effects | Rejected. No task is dropped, so the two samples are the same. |
 | The bridge's Wilson interval ignores clustering | Kept as a limit. The interval is not quoted, and the bridge is described as descriptive. |

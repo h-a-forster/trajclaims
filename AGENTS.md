@@ -29,8 +29,8 @@ and task-clustered intervals.
   fold under a hash of the inputs, and labeller answers appended per batch. Finished units are skipped; `--force` rebuilds
   extraction. Bump `EXTRACT_SCHEMA` or `DETECTOR_SCHEMA` when output changes.
 - `data/` and `tmp/` are gitignored. Never commit raw shards.
-- Commits and PRs carry no generated-by trailers. CI runs only on pull requests and manual
-  dispatch (metered minutes).
+- Commits and PRs carry no generated-by trailers. CI runs on pushes to main, pull requests and
+  manual dispatch.
 - Release hygiene: no personal names, local user paths or machine details in committed files.
 - Statistical honesty: report sizes, seeds and intervals; say when a number is a bound; the
   labellers are models, and there was no human adjudication.
