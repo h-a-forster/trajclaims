@@ -52,7 +52,7 @@ packages = ["src/trajclaims"]
 [tool.hatch.build.targets.sdist]
 include = [
     "src/trajclaims", "tests", "docs", "configs", "results", "uv.lock",
-    "README.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md", "CITATION.cff",
+    "README.md", "REPORT.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md", "CITATION.cff",
 ]
 
 [tool.pytest.ini_options]
