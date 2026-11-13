@@ -60,3 +60,11 @@ jobs:
       - name: CLI smoke
         shell: bash
         run: uv run trajclaims --version
+
+      - name: Generated summaries match the committed results
+        # tables.md and numbers.json rebuild offline from the committed results; the docs test
+        # checks every number in README.md and REPORT.md against numbers.json.
+        shell: bash
+        run: |
+          uv run trajclaims summarize
+          git diff --exit-code results/

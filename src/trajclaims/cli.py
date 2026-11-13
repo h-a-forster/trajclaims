@@ -1,4 +1,4 @@
-"""Command line: fetch, extract, sample, label, study, check."""
+"""Command line: fetch, extract, sample, label, study, summarize, check."""
 
 from __future__ import annotations
 
@@ -106,7 +106,19 @@ def cmd_study(args: argparse.Namespace) -> int:
         log=_log,
     )
     report.write_tables(OUT)
+    if "validation" in summary and "detector" in summary:
+        report.write_numbers(OUT)
+    else:
+        _log("numbers.json not rewritten: it needs the validation and detector blocks")
     _log(f"study done: labels {summary['labels_sha256'][:12]}")
+    return 0
+
+
+def cmd_summarize(_: argparse.Namespace) -> int:
+    """Rebuild tables.md and numbers.json from the committed results alone; offline, seconds."""
+    report.write_tables(OUT)
+    report.write_numbers(OUT)
+    print(f"wrote {OUT / 'tables.md'} and {OUT / 'numbers.json'}")
     return 0
 
 
@@ -139,6 +151,9 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--no-validation", action="store_true")
     run.add_argument("--no-detector", action="store_true")
     run.set_defaults(func=cmd_study)
+    commands.add_parser(
+        "summarize", help="rebuild tables.md and numbers.json from committed results"
+    ).set_defaults(func=cmd_summarize)
     commands.add_parser("check", help="labels byte-identical to results").set_defaults(
         func=cmd_check
     )

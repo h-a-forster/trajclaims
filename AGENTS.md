@@ -24,6 +24,11 @@ and task-clustered intervals.
 - The study makes no model calls. Only `trajclaims label` does, and its output is committed.
 - Every stochastic function takes a seed. `summary.json`, `fcr.csv`, `contrasts.csv` and
   `labels.jsonl` regenerate byte for byte.
+- Every number in `README.md`, `REPORT.md` and `CITATION.cff` is copied from
+  `results/v1/numbers.json`, which `trajclaims summarize` rebuilds (with `tables.md`) from the
+  committed results; `tests/test_docs.py` lists each claim and fails on any number it does not
+  cover. A new number needs a key in `report.numbers` and a claim, or a fixed entry whose source
+  the document states. CI rebuilds and runs `git diff --exit-code results/`.
 - Validate before writing; raise `DataError`. Count every excluded trial.
 - Long work is unit files written atomically: `data/units/` per row group, `data/detector/` per
   fold under a hash of the inputs, and labeller answers appended per batch. Finished units are skipped; `--force` rebuilds
@@ -50,7 +55,7 @@ and task-clustered intervals.
 | `src/trajclaims/study.py` | rates, bridge, sensitivity, outputs |
 | `src/trajclaims/models_effects.py` | estimands 3 and 4 |
 | `src/trajclaims/detector.py` | TF-IDF detector |
-| `src/trajclaims/report.py` | generated `results/v1/tables.md` |
+| `src/trajclaims/report.py` | generated `results/v1/tables.md` and `numbers.json` |
 | `scripts/fetch_tasks.py` | rebuild `configs/tasks.json` at a pinned commit |
 | `results/v1/` | committed outputs |
 
@@ -71,6 +76,7 @@ uv lock --check
 uv run trajclaims fetch       # 221 MB, hashes checked
 uv run trajclaims extract     # about 3 minutes
 uv run trajclaims study       # regenerates results/v1 from the committed validation.jsonl
+uv run trajclaims summarize   # tables.md and numbers.json only, from committed results; offline
 uv run trajclaims check       # labels byte-identical to the committed file
 ```
 
